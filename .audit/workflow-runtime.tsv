@@ -8,3 +8,5 @@ ts	phase	decision	why	evidence	result
 2026-08-26T19:01:11Z	verify	drafts are no-ops when unchanged and only fire from human edits	autosave was bumping version and racing Continue	src/components/inherit-form.tsx	noop draft test green
 2026-08-26T19:01:11Z	verify	skip Turso and Google OAuth	no credentials in the environment and the calendar file provider is enough	src/lib/config.ts dataDir	file calendar plus INHERIT_DATA_DIR
 2026-08-26T19:01:11Z	verify	typecheck lint tests and production build	prove it works on the real artifact not a proxy	npx tsc; npx eslint .; npm test; npm run build	all green, 24 tests, next build 12 routes
+2026-08-26T19:05:39Z	verify	poll schema every 2s as a backup for in-page WebMCP broadcast	judged reschedule must move the open confirmation without a refresh	commit 68d9ab0 src/components/inherit-form.tsx	untested in a real browser this turn
+2026-08-26T19:05:39Z	verify	live API judged sequence on next dev	human identity, agent slots and propose, human Wednesday, agent book with stale Tuesday id, reschedule	localhost:3000 session verify-1787770970	booked human slot, caps dropped book_slot, reschedule wrote new slot
