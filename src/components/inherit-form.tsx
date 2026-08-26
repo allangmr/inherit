@@ -78,10 +78,12 @@ export function InheritForm({
   preset = "inherit",
   compact = false,
   sessionKey,
+  registerTools = true,
 }: {
   preset?: TokenPreset;
   compact?: boolean;
   sessionKey?: string;
+  registerTools?: boolean;
 }) {
   const sessionId = useSyncExternalStore(
     () => () => {},
@@ -220,7 +222,7 @@ export function InheritForm({
       >
         <div className="inh-kicker">
           <span>{compact ? "Consult" : "30-minute consult"}</span>
-          <WebMcpBridge sessionId={sessionId || "pending"} />
+          <WebMcpBridge sessionId={sessionId || "pending"} enabled={registerTools} />
         </div>
         <h1 className="inh-title">{formDefinition.title}</h1>
         <p className="inh-subtitle">{formDefinition.description}</p>

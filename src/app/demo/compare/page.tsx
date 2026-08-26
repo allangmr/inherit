@@ -43,7 +43,7 @@ export default function ComparePage() {
           </h2>
           <div className="mt-6">
             <HostSystem preset="atelier" client="Atelier" />
-            <InheritForm preset="atelier" compact sessionKey="compare-atelier" />
+            <InheritForm preset="atelier" compact sessionKey="compare-atelier" registerTools={false} />
           </div>
         </section>
         <section className="northline-page border-t border-white/10 px-5 py-8 lg:border-l lg:border-t-0 md:px-8">
@@ -55,7 +55,7 @@ export default function ComparePage() {
           </h2>
           <div className="mt-6">
             <HostSystem preset="northline" client="Northline" />
-            <InheritForm preset="northline" compact sessionKey="compare-northline" />
+            <InheritForm preset="northline" compact sessionKey="compare-northline" registerTools={false} />
           </div>
         </section>
       </div>
