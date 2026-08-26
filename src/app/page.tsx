@@ -52,6 +52,18 @@ export default function HomePage() {
             >
               Script-tag embed
             </Link>
+            <Link
+              href="/demo/compare"
+              className="rounded-full border border-white/15 px-5 py-2.5 text-sm no-underline"
+            >
+              Compare hosts
+            </Link>
+            <Link
+              href="/lab"
+              className="rounded-full border border-white/15 px-5 py-2.5 text-sm no-underline"
+            >
+              WebMCP lab
+            </Link>
           </div>
           <ol className="mt-12 space-y-4">
             {tools.map(([name, copy], index) => (

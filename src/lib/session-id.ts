@@ -1,20 +1,22 @@
-const STORAGE_KEY = "inherit.sessionId";
-
-export function writeSessionId(id: string) {
-  if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(STORAGE_KEY, id);
+export function sessionStorageKey(namespace?: string) {
+  return namespace ? `inherit.sessionId.${namespace}` : "inherit.sessionId";
 }
 
-export function readSessionId() {
+export function writeSessionId(id: string, namespace?: string) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(sessionStorageKey(namespace), id);
+}
+
+export function readSessionId(namespace?: string) {
   if (typeof window === "undefined") return "";
   const fromUrl = new URLSearchParams(window.location.search).get("session");
-  if (fromUrl) {
+  if (fromUrl && !namespace) {
     writeSessionId(fromUrl);
     return fromUrl;
   }
-  const existing = window.sessionStorage.getItem(STORAGE_KEY);
+  const existing = window.sessionStorage.getItem(sessionStorageKey(namespace));
   if (existing) return existing;
   const created = crypto.randomUUID();
-  writeSessionId(created);
+  writeSessionId(created, namespace);
   return created;
 }

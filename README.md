@@ -24,6 +24,8 @@ If an agent books while the page is open, the page jumps to the confirmation. If
 | [`/book`](/book) | Clean top-level form. **Use this URL in ChatGPT’s in-app browser.** Tools register on this document. |
 | [`/demo/atelier`](/demo/atelier) | Warm editorial host (serif, cream, terracotta) |
 | [`/demo/northline`](/demo/northline) | Sharp SaaS host (hairline radius, IBM Plex, electric blue) |
+| [`/demo/compare`](/demo/compare) | Both hosts side by side: host buttons/inputs vs the Inherit form |
+| [`/lab`](/lab) | Chrome WebMCP lab — list and execute tools through the browser API |
 | [`/demo/embed`](/demo/embed) | `<inherit-form>` web component, no iframe |
 
 The Atelier and Northline pages render the **same form component**. Only the token preset changes.
@@ -62,12 +64,17 @@ const modelContext = document.modelContext || navigator.modelContext;
 3. Confirm the pill reads **Agent tools ready**.
 4. Ask ChatGPT to book a 30-minute first consult for you. It should call `get_form_schema` → `get_available_slots` → `book_slot` (or `submit_step` along the way).
 
-### Chrome 149+ with the testing flag
+### Chrome 146+ with the testing flag (this repo’s /lab)
 
-1. Enable `chrome://flags/#enable-webmcp-testing`.
-2. Open `/book` over HTTPS (or `localhost`).
-3. Use a WebMCP inspector / page agent to list tools.
-4. You should see exactly these five names.
+Chrome 148 in this environment is enough. The producer API is `navigator.modelContext` until Chrome 150.
+
+1. Enable `chrome://flags/#enable-webmcp-testing` (or launch with `--enable-features=WebMCP,WebMCPTesting`).
+2. Relaunch Chrome.
+3. Open **`/lab`** (or `/book`). The form registers the five tools on this document.
+4. In the **Chrome WebMCP lab** panel, click **List tools via Chrome**. That calls `getTools()` / `modelContextTesting.listTools()` — not our REST API.
+5. Run `get_form_schema`, then `submit_step (identity)`. The form on the left must show the name the tool wrote.
+
+If the probe shows `registerTool: false`, the flag is off. The lab will refuse to pretend.
 
 Tools unregister with `AbortSignal` when the form unmounts. There is no `unregisterTool` / `provideContext` / `clearContext` in this implementation.
 
