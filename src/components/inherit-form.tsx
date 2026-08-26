@@ -280,6 +280,26 @@ export function InheritForm({
     };
   }, [applyState, sessionKey, workflowId, sessionId]);
 
+  const seenVersion = useRef(0);
+  seenVersion.current = state?.session.version ?? seenVersion.current;
+
+  useEffect(() => {
+    if (!sessionId || boot) return;
+    const tick = window.setInterval(() => {
+      void apiFetch<WorkflowState>(
+        `/api/form/schema?sessionId=${encodeURIComponent(sessionId)}&workflowId=${encodeURIComponent(workflowId)}`,
+      ).then((schema) => {
+        const next = extractState(schema);
+        if (!next || next.session.version === seenVersion.current) return;
+        applyState(schema);
+        if (workflowId === "booking") {
+          void apiFetch<{ slots: Slot[] }>("/api/slots").then((data) => setSlots(data.slots ?? []));
+        }
+      });
+    }, 2000);
+    return () => window.clearInterval(tick);
+  }, [sessionId, boot, workflowId, applyState]);
+
   const values = useMemo(() => state?.session.values ?? {}, [state?.session.values]);
   const stepId = state?.session.currentStepId;
 
