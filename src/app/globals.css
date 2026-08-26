@@ -1,0 +1,61 @@
+@import "tailwindcss";
+@import "./inherit-form.css";
+
+:root {
+  --background: #0f1220;
+  --foreground: #f4f1ea;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+.site-shell {
+  min-height: 100vh;
+}
+
+.inherit-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(124, 92, 255, 0.28), transparent 34%),
+    radial-gradient(circle at 88% 0%, rgba(240, 195, 142, 0.16), transparent 28%),
+    #0f1220;
+}
+
+.inherit-grid {
+  background-image:
+    linear-gradient(rgba(244, 241, 234, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(244, 241, 234, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.atelier-page {
+  background: #f3eadc;
+  color: #2b1d12;
+  font-family: var(--font-source-serif), Georgia, serif;
+}
+
+.northline-page {
+  background: #07090d;
+  color: #e8eef7;
+  font-family: var(--font-ibm-plex), ui-sans-serif, system-ui, sans-serif;
+}
