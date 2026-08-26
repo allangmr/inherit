@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 const links = [
-  { href: "/book", label: "Book" },
-  { href: "/lab", label: "WebMCP lab" },
+  { href: "/demo/atelier", label: "Appointment" },
+  { href: "/demo/studio", label: "Brief" },
+  { href: "/book", label: "ChatGPT" },
+  { href: "/lab", label: "Lab" },
   { href: "/demo/compare", label: "Compare" },
-  { href: "/demo/atelier", label: "Atelier" },
-  { href: "/demo/northline", label: "Northline" },
 ];
 
 export function SiteNav({ inverted = false }: { inverted?: boolean }) {
@@ -29,7 +29,7 @@ export function SiteNav({ inverted = false }: { inverted?: boolean }) {
           </Link>
         ))}
         <Link
-          href="/book"
+          href="/demo/atelier"
           className={`rounded-full px-3.5 py-1.5 no-underline ${
             inverted ? "bg-[#b8431f] text-[#fff8ee]" : "bg-white/10 text-[#f4f1ea]"
           }`}

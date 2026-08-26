@@ -105,6 +105,23 @@ export function isWeekend(date: Date, timeZone = STUDIO_TIMEZONE) {
   return weekday === 0 || weekday === 6;
 }
 
+export function labelFromSlotId(slotId: string, timeZone = STUDIO_TIMEZONE) {
+  const match = /^slot-(\d{8})-(\d{4})$/.exec(slotId);
+  if (!match) return slotId;
+  const ymd = match[1];
+  const hm = match[2];
+  const start = zonedDate(
+    Number(ymd.slice(0, 4)),
+    Number(ymd.slice(4, 6)),
+    Number(ymd.slice(6, 8)),
+    Number(hm.slice(0, 2)),
+    Number(hm.slice(2, 4)),
+    timeZone,
+  );
+  const end = addMinutes(start, SLOT_MINUTES);
+  return formatSlotRange(start.toISOString(), end.toISOString(), timeZone);
+}
+
 export function formatSlotRange(startIso: string, endIso: string, timeZone = STUDIO_TIMEZONE) {
   const start = new Date(startIso);
   const end = new Date(endIso);
@@ -129,11 +146,6 @@ export function workingWindowStarts(from = new Date(), days = SLOT_LOOKAHEAD_DAY
     const day = addZonedDays(cursor, i);
     if (isWeekend(day)) continue;
     const parts = zonedParts(day);
-    if (parts.year === zonedParts(from).year &&
-      parts.month === zonedParts(from).month &&
-      parts.day === zonedParts(from).day) {
-      // include today only if slots remain
-    }
     for (let hour = STUDIO_OPEN_HOUR; hour < STUDIO_CLOSE_HOUR; hour += 1) {
       if (hour >= STUDIO_LUNCH_START && hour < STUDIO_LUNCH_END) continue;
       for (let minute = 0; minute < 60; minute += SLOT_MINUTES) {

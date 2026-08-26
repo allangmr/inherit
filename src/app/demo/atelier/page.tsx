@@ -1,15 +1,16 @@
-import Link from "next/link";
-import { HostSystem } from "@/components/host-system";
+import { DemoSwitcher } from "@/components/demo-switcher";
 import { InheritForm } from "@/components/inherit-form";
+import Link from "next/link";
 
 export const metadata = {
   title: "Atelier Lumen · Book a sitting",
-  description: "Warm editorial host demo. Inherit reads the studio's tokens and disappears into the page.",
+  description: "Warm editorial host demo. The booking card is one Inherit workflow, not the product.",
 };
 
 export default function AtelierPage() {
   return (
     <div className="atelier-page min-h-screen">
+      <DemoSwitcher />
       <div className="mx-auto max-w-6xl px-6 py-8 md:px-10">
         <header className="flex items-end justify-between gap-6 border-b border-[#2b1d12]/15 pb-6">
           <div>
@@ -42,32 +43,13 @@ export default function AtelierPage() {
               Light, then likeness. A half-hour consult to decide how the sitting should feel.
             </p>
             <p className="mt-6 text-lg leading-8">
-              This page is a fake studio on purpose. The booking card on the right is the same
-              Inherit form as the indigo SaaS demo — it only inherited cream paper, terracotta,
-              and a serif. No theme fork. No iframe chrome.
+              This page is a fake studio on purpose. The card on the right is an Inherit workflow
+              wearing Atelier&apos;s paper, terracotta, and serif. A person and an agent share the
+              same session. Add <code>?inspect=1</code> to watch the tools change.
             </p>
-            <dl className="mt-10 grid gap-6 text-sm sm:grid-cols-3">
-              <div>
-                <dt className="uppercase tracking-[0.18em] text-[#6d5644]">Duration</dt>
-                <dd className="mt-1 text-xl">30 minutes</dd>
-              </div>
-              <div>
-                <dt className="uppercase tracking-[0.18em] text-[#6d5644]">Capacity</dt>
-                <dd className="mt-1 text-xl">3 per slot</dd>
-              </div>
-              <div>
-                <dt className="uppercase tracking-[0.18em] text-[#6d5644]">Place</dt>
-                <dd className="mt-1 text-xl">Alberta, or video</dd>
-              </div>
-            </dl>
-            <blockquote className="mt-12 border-l-2 border-[#c4a36a] pl-5 text-[#6d5644]">
-              Tokens, not screenshots. If the host changes `--inh-color-primary`, the form
-              follows.
-            </blockquote>
           </article>
           <aside>
-            <HostSystem preset="atelier" client="Atelier" />
-            <InheritForm preset="atelier" compact sessionKey="atelier-host" />
+            <InheritForm preset="atelier" compact sessionKey="atelier-host" workflowId="booking" />
           </aside>
         </div>
       </div>

@@ -3,6 +3,7 @@ import type {
   CalendarProvider,
   CreateEventInput,
   TimeSlot,
+  UpdateEventInput,
 } from "./calendar";
 
 export type GoogleCalendarEnv = {
@@ -27,11 +28,6 @@ export function isGoogleCalendarConfigured(env: GoogleCalendarEnv = readGoogleCa
   return Boolean(env.clientId && env.clientSecret && env.refreshToken && env.calendarId);
 }
 
-/**
- * Env-gated Google Calendar adapter.
- * The interface matches FileCalendarProvider so swapping providers is a factory change.
- * Real OAuth + Calendar API calls are intentionally stubbed for this MVP.
- */
 export class GoogleCalendarProvider implements CalendarProvider {
   readonly name = "google";
 
@@ -52,9 +48,7 @@ export class GoogleCalendarProvider implements CalendarProvider {
   async listSlots(input?: { from?: string; to?: string }): Promise<TimeSlot[]> {
     void input;
     this.assertConfigured();
-    throw new Error(
-      "Google Calendar adapter is stubbed. Next wiring: OAuth refresh → calendar.freebusy.query + events.list, then subtract busy times from working hours.",
-    );
+    throw new Error("Google Calendar adapter is stubbed. Use CALENDAR_PROVIDER=file for the demo.");
   }
 
   async getSlot(slotId: string): Promise<TimeSlot | null> {
@@ -66,9 +60,19 @@ export class GoogleCalendarProvider implements CalendarProvider {
   async createEvent(input: CreateEventInput): Promise<CalendarEvent> {
     void input;
     this.assertConfigured();
-    throw new Error(
-      "Google Calendar adapter is stubbed. Next wiring: calendar.events.insert with attendees and conferenceData.",
-    );
+    throw new Error("Google Calendar adapter is stubbed. Use CALENDAR_PROVIDER=file for the demo.");
+  }
+
+  async updateEvent(input: UpdateEventInput): Promise<CalendarEvent> {
+    void input;
+    this.assertConfigured();
+    throw new Error("Google Calendar adapter is stubbed. Use CALENDAR_PROVIDER=file for the demo.");
+  }
+
+  async cancelEvent(eventId: string): Promise<void> {
+    void eventId;
+    this.assertConfigured();
+    throw new Error("Google Calendar adapter is stubbed. Use CALENDAR_PROVIDER=file for the demo.");
   }
 
   async getEvent(eventId: string): Promise<CalendarEvent | null> {

@@ -178,6 +178,7 @@ export const tokenPresets = {
   inherit: inheritTokens,
   atelier: atelierTokens,
   northline: northlineTokens,
+  host: inheritTokens,
 } as const;
 
 export type TokenPreset = keyof typeof tokenPresets;

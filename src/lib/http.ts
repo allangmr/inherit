@@ -9,3 +9,7 @@ export async function readJson<T>(request: Request): Promise<T> {
 export function errorResponse(message: string, status = 400, extra?: Record<string, unknown>) {
   return json({ ok: false, error: message, ...extra }, status);
 }
+
+export function isStale(error: unknown) {
+  return Boolean(error && typeof error === "object" && (error as { name?: string }).name === "StaleSessionError");
+}

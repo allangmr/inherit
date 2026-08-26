@@ -1,9 +1,15 @@
 "use client";
 
+import type { Actor } from "@/lib/store";
 import type { ModelContextTool } from "@/types/webmcp";
-import { apiFetch, broadcastFormState } from "./webmcp";
+import {
+  apiFetch,
+  broadcastFormState,
+  broadcastToolTrace,
+} from "./webmcp";
 
 type SessionGetter = () => string;
+type WorkflowGetter = () => string;
 
 function asArgs(raw: unknown): Record<string, unknown> {
   if (typeof raw === "string") {
@@ -28,198 +34,286 @@ function resultPayload(data: unknown) {
   return JSON.stringify(data);
 }
 
+async function traced(
+  name: string,
+  raw: unknown,
+  run: () => Promise<unknown>,
+) {
+  const started = performance.now();
+  const input = asArgs(raw);
+  try {
+    const data = await run();
+    broadcastToolTrace({
+      name,
+      input,
+      result: data,
+      durationMs: Math.round(performance.now() - started),
+      actor: "agent",
+      timestamp: new Date().toISOString(),
+    });
+    return data;
+  } catch (error) {
+    broadcastToolTrace({
+      name,
+      input,
+      result: { error: error instanceof Error ? error.message : "failed" },
+      durationMs: Math.round(performance.now() - started),
+      actor: "agent",
+      timestamp: new Date().toISOString(),
+    });
+    throw error;
+  }
+}
+
 async function syncAndReturn(data: unknown) {
   broadcastFormState(data);
   return resultPayload(data);
 }
 
-export function createInheritTools(getSessionId: SessionGetter): ModelContextTool[] {
+function sessionOf(args: Record<string, unknown>, getSessionId: SessionGetter) {
+  return String(args.sessionId ?? getSessionId());
+}
+
+export function createWorkflowTools(
+  getSessionId: SessionGetter,
+  getWorkflowId: WorkflowGetter = () => "booking",
+): ModelContextTool[] {
+  const actor: Actor = "agent";
+
+  const actionTool = (
+    name: string,
+    description: string,
+    readOnly: boolean,
+    inputSchema: ModelContextTool["inputSchema"],
+  ): ModelContextTool => ({
+    name,
+    description,
+    annotations: { readOnlyHint: readOnly },
+    inputSchema,
+    execute: async (raw, extras) =>
+      traced(name, raw, async () => {
+        const args = asArgs(raw);
+        const signal = asSignal(extras);
+        const payload = { ...args };
+        delete payload.sessionId;
+        const data = await apiFetch("/api/workflow/action", {
+          method: "POST",
+          signal,
+          actor,
+          body: JSON.stringify({
+            sessionId: sessionOf(args, getSessionId),
+            workflowId: getWorkflowId(),
+            action: name,
+            payload: Object.keys(payload).length ? payload : args,
+          }),
+        });
+        if (!readOnly) return syncAndReturn(data);
+        if (data && typeof data === "object" && "state" in data) return syncAndReturn(data);
+        return resultPayload(data);
+      }),
+  });
+
   return [
     {
       name: "get_form_schema",
       description:
-        "Return the full multi-step Inherit booking form: steps, fields, validation rules, and the current session values. Call this first to see what the human has already entered and which step is active.",
+        "Return the workflow: steps, fields, validation, current values, capabilities, and activity.",
       annotations: { readOnlyHint: true },
       inputSchema: {
         type: "object",
         additionalProperties: false,
-        properties: {
-          sessionId: {
-            type: "string",
-            description:
-              "Existing form session id. Omit to use the session already open on this page.",
-          },
-        },
+        properties: { sessionId: { type: "string" } },
       },
-      execute: async (raw, extras) => {
-        const args = asArgs(raw);
-        const signal = asSignal(extras);
-        const sessionId = String(args.sessionId ?? getSessionId());
-        const data = await apiFetch(`/api/form/schema?sessionId=${encodeURIComponent(sessionId)}`, {
-          signal,
-        });
-        return syncAndReturn(data);
-      },
+      execute: async (raw, extras) =>
+        traced("get_form_schema", raw, async () => {
+          const args = asArgs(raw);
+          const signal = asSignal(extras);
+          const sessionId = sessionOf(args, getSessionId);
+          const workflowId = getWorkflowId();
+          const data = await apiFetch(
+            `/api/form/schema?sessionId=${encodeURIComponent(sessionId)}&workflowId=${encodeURIComponent(workflowId)}`,
+            { signal, actor },
+          );
+          return syncAndReturn(data);
+        }),
     },
     {
-      name: "get_available_slots",
+      name: "get_brief_schema",
       description:
-        "List 30-minute consult slots that still have remaining capacity (default max 3 bookings per slot). Occupied/full slots are omitted from `slots`. Use ISO-8601 from/to to narrow the window.",
+        "Return the creative brief workflow, current values, missing fields, and available capabilities.",
       annotations: { readOnlyHint: true },
       inputSchema: {
         type: "object",
         additionalProperties: false,
-        properties: {
-          from: {
-            type: "string",
-            description: "ISO-8601 start of the search window. Defaults to now.",
-          },
-          to: {
-            type: "string",
-            description: "ISO-8601 end of the search window.",
-          },
-        },
+        properties: { sessionId: { type: "string" } },
       },
-      execute: async (raw, extras) => {
-        const args = asArgs(raw);
-        const signal = asSignal(extras);
-        const params = new URLSearchParams();
-        if (args.from) params.set("from", String(args.from));
-        if (args.to) params.set("to", String(args.to));
-        const data = await apiFetch(`/api/slots?${params.toString()}`, { signal });
-        return resultPayload(data);
-      },
+      execute: async (raw, extras) =>
+        traced("get_brief_schema", raw, async () => {
+          const args = asArgs(raw);
+          const signal = asSignal(extras);
+          const sessionId = sessionOf(args, getSessionId);
+          const data = await apiFetch(
+            `/api/form/schema?sessionId=${encodeURIComponent(sessionId)}&workflowId=brief`,
+            { signal, actor },
+          );
+          return syncAndReturn(data);
+        }),
     },
     {
       name: "submit_step",
       description:
-        "Validate and persist one step of the form, then advance to the next step. Use stepId identity | need | slot | confirm. Values must satisfy that step's validation rules from get_form_schema. After success, the on-page form updates to the same state.",
+        "Validate and persist one step of the form, then advance. Same path as the human UI.",
       annotations: { readOnlyHint: false },
       inputSchema: {
         type: "object",
         additionalProperties: false,
         required: ["stepId", "values"],
         properties: {
-          sessionId: {
-            type: "string",
-            description: "Form session id. Omit to use the page session.",
-          },
-          stepId: {
-            type: "string",
-            enum: ["identity", "need", "slot", "confirm"],
-            description: "Which step to submit.",
-          },
-          values: {
-            type: "object",
-            description:
-              "Field values for this step. identity: name, email, phone. need: service (first_consult|follow_up|focused), format (studio|video), notes. slot: slotId. confirm: consent (true).",
-            additionalProperties: true,
-          },
+          sessionId: { type: "string" },
+          stepId: { type: "string" },
+          values: { type: "object", additionalProperties: true },
         },
       },
-      execute: async (raw, extras) => {
-        const args = asArgs(raw);
-        const signal = asSignal(extras);
-        const data = await apiFetch("/api/form/step", {
-          method: "POST",
-          signal,
-          body: JSON.stringify({
-            sessionId: args.sessionId ?? getSessionId(),
-            stepId: args.stepId,
-            values: args.values ?? {},
-          }),
-        });
-        return syncAndReturn(data);
-      },
+      execute: async (raw, extras) =>
+        traced("submit_step", raw, async () => {
+          const args = asArgs(raw);
+          const signal = asSignal(extras);
+          const data = await apiFetch("/api/form/step", {
+            method: "POST",
+            signal,
+            actor,
+            body: JSON.stringify({
+              sessionId: sessionOf(args, getSessionId),
+              workflowId: getWorkflowId(),
+              stepId: args.stepId,
+              values: args.values ?? {},
+            }),
+          });
+          return syncAndReturn(data);
+        }),
     },
     {
-      name: "book_slot",
-      description:
-        "Book a 30-minute consult: create the calendar event, persist the submission, and mark the session complete. Requires a free slotId from get_available_slots plus guest name and email (from the session or passed in values). The on-page form jumps to the confirmation state.",
+      name: "update_brief",
+      description: "Validate and persist one step of the creative brief, then advance.",
       annotations: { readOnlyHint: false },
       inputSchema: {
         type: "object",
         additionalProperties: false,
-        required: ["slotId"],
+        required: ["stepId", "values"],
         properties: {
-          sessionId: {
-            type: "string",
-            description: "Form session id. Omit to use the page session.",
-          },
-          slotId: {
-            type: "string",
-            description: "Id from get_available_slots, e.g. slot-20260827-0930.",
-          },
-          values: {
-            type: "object",
-            description:
-              "Optional overrides merged into the session: name, email, phone, service, format, notes, consent.",
-            additionalProperties: true,
-            properties: {
-              name: { type: "string" },
-              email: { type: "string", format: "email" },
-              phone: { type: "string" },
-              service: {
-                type: "string",
-                enum: ["first_consult", "follow_up", "focused"],
-              },
-              format: { type: "string", enum: ["studio", "video"] },
-              notes: { type: "string" },
-              consent: { type: "boolean" },
-            },
-          },
+          sessionId: { type: "string" },
+          stepId: { type: "string" },
+          values: { type: "object", additionalProperties: true },
         },
       },
-      execute: async (raw, extras) => {
-        const args = asArgs(raw);
-        const signal = asSignal(extras);
-        const data = await apiFetch("/api/book", {
-          method: "POST",
-          signal,
-          body: JSON.stringify({
-            sessionId: args.sessionId ?? getSessionId(),
-            slotId: args.slotId,
-            values: args.values ?? {},
-          }),
-        });
-        return syncAndReturn(data);
-      },
-    },
-    {
-      name: "get_booking_status",
-      description:
-        "Look up confirmed bookings by email or booking id. Returns slot time, calendar event id, and stored submission fields.",
-      annotations: { readOnlyHint: true },
-      inputSchema: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          email: {
-            type: "string",
-            format: "email",
-            description: "Guest email used when booking.",
-          },
-          bookingId: {
-            type: "string",
-            description: "Booking id returned by book_slot, e.g. bk_…",
-          },
-        },
-      },
-      execute: async (raw, extras) => {
-        const args = asArgs(raw);
-        const signal = asSignal(extras);
-        if (!args.email && !args.bookingId) {
-          return resultPayload({
-            ok: false,
-            error: "Provide email or bookingId.",
+      execute: async (raw, extras) =>
+        traced("update_brief", raw, async () => {
+          const args = asArgs(raw);
+          const signal = asSignal(extras);
+          const data = await apiFetch("/api/form/step", {
+            method: "POST",
+            signal,
+            actor,
+            body: JSON.stringify({
+              sessionId: sessionOf(args, getSessionId),
+              workflowId: "brief",
+              stepId: args.stepId,
+              values: args.values ?? {},
+            }),
           });
-        }
-        const params = new URLSearchParams();
-        if (args.email) params.set("email", String(args.email));
-        if (args.bookingId) params.set("bookingId", String(args.bookingId));
-        const data = await apiFetch(`/api/booking?${params.toString()}`, { signal });
-        return resultPayload(data);
-      },
+          return syncAndReturn(data);
+        }),
     },
+    actionTool("get_available_slots", "List 30-minute slots with remaining capacity.", true, {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        from: { type: "string" },
+        to: { type: "string" },
+      },
+    }),
+    actionTool("propose_slot", "Propose a slot without booking it.", false, {
+      type: "object",
+      additionalProperties: false,
+      required: ["slotId"],
+      properties: {
+        sessionId: { type: "string" },
+        slotId: { type: "string" },
+        note: { type: "string" },
+      },
+    }),
+    actionTool("book_slot", "Book the selected or provided slot.", false, {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        sessionId: { type: "string" },
+        slotId: { type: "string" },
+        values: { type: "object", additionalProperties: true },
+      },
+    }),
+    actionTool("get_booking_status", "Look up bookings by email or booking id.", true, {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        email: { type: "string", format: "email" },
+        bookingId: { type: "string" },
+      },
+    }),
+    actionTool("reschedule_booking", "Move a confirmed booking to another free slot.", false, {
+      type: "object",
+      additionalProperties: false,
+      required: ["slotId"],
+      properties: {
+        sessionId: { type: "string" },
+        slotId: { type: "string" },
+      },
+    }),
+    actionTool("cancel_booking", "Cancel the confirmed booking. May require human confirmation.", false, {
+      type: "object",
+      additionalProperties: false,
+      properties: { sessionId: { type: "string" } },
+    }),
+    actionTool("suggest_deliverables", "Suggest a primary deliverable from the goal text.", false, {
+      type: "object",
+      additionalProperties: false,
+      properties: { sessionId: { type: "string" } },
+    }),
+    actionTool("identify_missing_information", "List required brief fields that are still empty.", true, {
+      type: "object",
+      additionalProperties: false,
+      properties: { sessionId: { type: "string" } },
+    }),
+    actionTool("submit_project_brief", "Lock the creative brief.", false, {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        sessionId: { type: "string" },
+        values: { type: "object", additionalProperties: true },
+      },
+    }),
+    actionTool("get_brief_status", "Return whether the brief is in progress or submitted.", true, {
+      type: "object",
+      additionalProperties: false,
+      properties: { sessionId: { type: "string" } },
+    }),
+    actionTool("commit_proposal", "Commit the pending proposal on this session.", false, {
+      type: "object",
+      additionalProperties: false,
+      properties: { sessionId: { type: "string" } },
+    }),
+    actionTool("reject_proposal", "Dismiss the pending proposal.", false, {
+      type: "object",
+      additionalProperties: false,
+      properties: { sessionId: { type: "string" } },
+    }),
   ];
+}
+
+export function createInheritTools(getSessionId: SessionGetter) {
+  return createWorkflowTools(getSessionId, () => "booking");
+}
+
+export function toolsNamed(tools: ModelContextTool[], names: string[]) {
+  const allow = new Set(names);
+  return tools.filter((tool) => allow.has(tool.name));
 }

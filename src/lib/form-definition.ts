@@ -170,18 +170,18 @@ export type FormValues = Record<string, string | boolean | undefined>;
 
 export type FieldError = { fieldId: string; message: string };
 
-export function getStep(stepId: string) {
-  return formDefinition.steps.find((step) => step.id === stepId) ?? null;
+export function getStep(stepId: string, definition: FormDefinition = formDefinition) {
+  return definition.steps.find((step) => step.id === stepId) ?? null;
 }
 
-export function nextStepId(stepId: string) {
-  const index = formDefinition.steps.findIndex((step) => step.id === stepId);
-  return formDefinition.steps[index + 1]?.id ?? null;
+export function nextStepId(stepId: string, definition: FormDefinition = formDefinition) {
+  const index = definition.steps.findIndex((step) => step.id === stepId);
+  return definition.steps[index + 1]?.id ?? null;
 }
 
-export function previousStepId(stepId: string) {
-  const index = formDefinition.steps.findIndex((step) => step.id === stepId);
-  return index > 0 ? formDefinition.steps[index - 1].id : null;
+export function previousStepId(stepId: string, definition: FormDefinition = formDefinition) {
+  const index = definition.steps.findIndex((step) => step.id === stepId);
+  return index > 0 ? definition.steps[index - 1].id : null;
 }
 
 function isEmpty(value: string | boolean | undefined) {
@@ -207,8 +207,12 @@ export function validateField(field: FormField, value: string | boolean | undefi
   return null;
 }
 
-export function validateStep(stepId: string, values: FormValues): FieldError[] {
-  const step = getStep(stepId);
+export function validateStep(
+  stepId: string,
+  values: FormValues,
+  definition: FormDefinition = formDefinition,
+): FieldError[] {
+  const step = getStep(stepId, definition);
   if (!step) return [{ fieldId: "step", message: `Unknown step: ${stepId}` }];
   return step.fields
     .map((field) => {
@@ -218,19 +222,19 @@ export function validateStep(stepId: string, values: FormValues): FieldError[] {
     .filter((error): error is FieldError => Boolean(error));
 }
 
-export function validateAll(values: FormValues): FieldError[] {
-  return formDefinition.steps.flatMap((step) => validateStep(step.id, values));
+export function validateAll(values: FormValues, definition: FormDefinition = formDefinition): FieldError[] {
+  return definition.steps.flatMap((step) => validateStep(step.id, values, definition));
 }
 
-export function agentToolSchema() {
+export function projectForm(definition: FormDefinition = formDefinition) {
   return {
-    formId: formDefinition.id,
-    title: formDefinition.title,
-    description: formDefinition.description,
-    durationMinutes: formDefinition.durationMinutes,
-    timezone: formDefinition.timezone,
-    location: formDefinition.location,
-    steps: formDefinition.steps.map((step, index) => ({
+    id: definition.id,
+    title: definition.title,
+    description: definition.description,
+    durationMinutes: definition.durationMinutes,
+    timezone: definition.timezone,
+    location: definition.location,
+    steps: definition.steps.map((step, index) => ({
       id: step.id,
       index,
       title: step.title,
@@ -240,9 +244,14 @@ export function agentToolSchema() {
         type: field.type,
         label: field.label,
         hint: field.hint,
+        placeholder: field.placeholder,
         options: field.options,
         validation: field.rules,
       })),
     })),
   };
+}
+
+export function agentToolSchema() {
+  return projectForm(formDefinition);
 }

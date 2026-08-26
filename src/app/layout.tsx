@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import {
   Fraunces,
   Geist,
@@ -42,12 +43,12 @@ const ibmMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Inherit — agent-native forms that inherit the host",
+  title: "Inherit. One workflow for humans and agents.",
   description:
-    "A lightweight, embeddable multi-step form and booking system. Pixel-perfect design-token inheritance plus first-class WebMCP tools for humans and agents.",
+    "A shared workflow runtime. People and AI agents complete the same steps against the same state, validation, and domain actions.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"

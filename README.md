@@ -1,43 +1,134 @@
 # Inherit
 
-A lightweight, embeddable multi-step form + booking system that **inherits a host site’s design tokens** and is **fully agent-native via WebMCP**.
+One workflow. Shared by humans and agents.
 
-This is not another Fillout. Inherit is the first form+booking surface designed so humans and AI agents use the same interface: pixel-perfect visual integration, and structured tools registered on the live page.
+Inherit turns a website workflow into an interface that people and AI agents complete together. One definition drives the human UI, WebMCP capabilities, validation, and domain actions. There is no second agent API.
 
 Built for the [OpenAI WebMCP Challenge](https://openai.com) (August 25–September 3, 2026). MIT licensed.
 
-## Why this exists
+## Why
 
-Most “AI-ready” forms are a human UI plus a bolted-on API. The agent scrapes, guesses, or talks to a second system. Inherit keeps one state machine:
+Most "AI-ready" sites still ship two systems:
 
-- A person filling a step and an agent calling `submit_step` write the same session.
-- `book_slot` creates the calendar event the picker already showed as free.
-- `get_form_schema` returns the schema **and** the values currently on screen.
+```text
+human UI
++
+separate agent integration
+```
 
-If an agent books while the page is open, the page jumps to the confirmation. If a human types a name, the next `get_form_schema` call sees it.
+That duplicates state, validation, permissions, and business logic. The agent scrapes, guesses, or talks to a sidecar.
 
-## Demo URLs
+Inherit keeps one runtime:
 
-| URL | What judges should notice |
+```text
+Workflow definition
+        ↓
+Human UI  ·  WebMCP tools  ·  Validation
+        ↓
+Shared session
+        ↓
+Domain actions
+```
+
+A person typing a name and an agent calling `submit_step` write the same session. If the agent books while the page is open, the page jumps to confirmation. If the human picks Wednesday, the next `get_form_schema` call already has Wednesday.
+
+## Demo
+
+| URL | What to notice |
 | --- | --- |
-| [`/`](/) | Inherit-branded landing + live form |
-| [`/book`](/book) | Clean top-level form. **Use this URL in ChatGPT’s in-app browser.** Tools register on this document. |
-| [`/demo/atelier`](/demo/atelier) | Warm editorial host (serif, cream, terracotta) |
-| [`/demo/northline`](/demo/northline) | Sharp SaaS host (hairline radius, IBM Plex, electric blue) |
-| [`/demo/compare`](/demo/compare) | Both hosts side by side: host buttons/inputs vs the Inherit form |
-| [`/lab`](/lab) | Chrome WebMCP lab — list and execute tools through the browser API |
-| [`/demo/embed`](/demo/embed) | `<inherit-form>` web component, no iframe |
+| [`/`](/) | Thesis + live booking workflow |
+| [`/book`](/book) | Top-level ChatGPT URL. Tools register on this document. |
+| [`/demo/atelier`](/demo/atelier) | Appointment workflow in a warm editorial host |
+| [`/demo/studio`](/demo/studio) | Creative brief. Different steps, same runtime. |
+| [`/demo/compare`](/demo/compare) | Two hosts, same component. Tools off so the copies do not fight. |
+| [`/demo/atelier?inspect=1`](/demo/atelier?inspect=1) | Inspector. Session, live capabilities, last tool call. |
+| [`/lab`](/lab) | Chrome WebMCP lab |
 
-The Atelier and Northline pages render the **same form component**. Only the token preset changes.
+The judged path is `/demo/atelier`. Use `/book` in ChatGPT's in-app browser.
 
-## Run it
+## The core idea
+
+A `WorkflowDefinition` lists steps, fields, actions, and when each action is legal. The runtime projects that into:
+
+- the form UI
+- `getAvailableTools(workflow, session)`
+- server validation
+- SQLite session + activity
+
+Booking is one demonstration of that runtime. The studio brief is the proof it is not booking-specific.
+
+## Human-agent collaboration
+
+There is one `SessionRecord`. No agent session.
+
+1. Human enters name and email.
+2. Agent submits preferences with `submit_step`.
+3. Agent lists slots, then `propose_slot` for Tuesday.
+4. Human clicks Wednesday. Activity rail records both.
+5. Agent calls `book_slot` on the selected value. The page confirms.
+6. Agent later calls `reschedule_booking`. The confirmation updates in place.
+
+Drafts, tools, and buttons all hit `/api/form/*` or `/api/workflow/action`. Tool calls are not trusted. They run the same validators as the UI.
+
+## Dynamic capabilities
+
+Tools are registered from the current session, then torn down with `AbortSignal` when the set changes.
+
+Before a booking:
+
+```text
+get_form_schema
+submit_step
+get_available_slots
+propose_slot
+book_slot
+```
+
+After confirmation:
+
+```text
+get_form_schema
+get_available_slots
+get_booking_status
+reschedule_booking
+cancel_booking
+```
+
+`book_slot` is gone. `cancel_booking` from an agent creates a proposal the human can confirm.
+
+## Inspector
+
+Open any workflow with `?inspect=1`, or use Developer mode on the form.
+
+It shows session id, workflow, step, version, booking id, the live capability list with add/remove deltas, the last WebMCP execution, and a small architecture diagram. JSON stays here, not in the main flow.
+
+## Architecture
+
+```
+src/lib/workflow/           definition, capabilities, session, dispatch
+src/lib/workflows/booking.ts
+src/lib/workflows/brief.ts
+src/lib/booking-service.ts  calendar domain (book, reschedule, cancel)
+src/lib/sqlite-store.ts     sessions, bookings, activity
+src/lib/inherit-tools.ts    WebMCP executors
+src/components/inherit-form.tsx
+src/components/activity-rail.tsx
+src/components/inherit-inspector.tsx
+src/app/api/form/*          schema + step
+src/app/api/workflow/action generic action entry
+src/app/api/book            book_slot wrapper
+```
+
+Human UI and WebMCP both enter through the route handlers, then the workflow runtime, then the domain service, then the store.
+
+## Running locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). No Google OAuth. The default calendar is a deterministic file/SQLite provider.
+Open [http://localhost:3000](http://localhost:3000). No Google OAuth. The default calendar is the file/SQLite provider.
 
 ```bash
 npm run build
@@ -45,120 +136,52 @@ npm start
 npm test
 ```
 
-Copy `.env.example` if you want to override slot capacity, timezone, or data directory. Leave `CALENDAR_PROVIDER=file` for the judged demo.
+Copy `.env.example` to override slot capacity, timezone, or `INHERIT_DATA_DIR`. Leave `CALENDAR_PROVIDER=file` for the judged demo.
 
-## How to test WebMCP
-
-Feature detection used in this repo:
+WebMCP needs a secure context. Feature detection:
 
 ```ts
 const modelContext = document.modelContext || navigator.modelContext;
 ```
 
-`document.modelContext` is current (Chrome docs, updated August 20, 2026). `navigator.modelContext` is deprecated in Chrome 150 and kept as a fallback for ChatGPT’s in-app browser and Chrome 149 with the WebMCP testing flag.
+`document.modelContext` is current. `navigator.modelContext` is the ChatGPT / Chrome 149 fallback.
 
-### ChatGPT desktop (in-app browser)
+### ChatGPT desktop
 
-1. Deploy or tunnel the app over HTTPS (WebMCP requires a secure context).
-2. Open **`/book`** in ChatGPT’s in-app browser — not a cross-origin iframe.
-3. Confirm the pill reads **Agent tools ready**.
-4. Ask ChatGPT to book a 30-minute first consult for you. It should call `get_form_schema` → `get_available_slots` → `book_slot` (or `submit_step` along the way).
+1. Serve the app over HTTPS.
+2. Open **`/book`** in the in-app browser, not an iframe.
+3. Confirm **Agent tools ready**.
+4. Ask it to finish a consult using the shared session.
 
-### Chrome 146+ with the testing flag (this repo’s /lab)
+### Chrome lab
 
-Chrome 148 in this environment is enough. The producer API is `navigator.modelContext` until Chrome 150.
-
-1. Enable `chrome://flags/#enable-webmcp-testing` (or launch with `--enable-features=WebMCP,WebMCPTesting`).
-2. Relaunch Chrome.
-3. Open **`/lab`** (or `/book`). The form registers the five tools on this document.
-4. In the **Chrome WebMCP lab** panel, click **List tools via Chrome**. That calls `getTools()` / `modelContextTesting.listTools()` — not our REST API.
-5. Run `get_form_schema`, then `submit_step (identity)`. The form on the left must show the name the tool wrote.
-
-If the probe shows `registerTool: false`, the flag is off. The lab will refuse to pretend.
-
-Tools unregister with `AbortSignal` when the form unmounts. There is no `unregisterTool` / `provideContext` / `clearContext` in this implementation.
-
-### Cross-origin iframe note
-
-This demo prefers a same-origin component / `<inherit-form>` script tag. If you embed via iframe anyway:
-
-```html
-<iframe src="https://your-host/embed?theme=atelier" allow="tools"></iframe>
-```
-
-The iframe must also pass `exposedTo: ['https://parent-origin']` on `registerTool`. For the ChatGPT in-app demo, skip the iframe and load `/book` at the top level.
-
-## Agent vs human judging script
-
-Takes about three minutes.
-
-1. **Inheritance.** Open `/demo/atelier` and `/demo/northline` side by side. Same steps, same copy, different paper / radius / type. Then open `/book` for the Inherit brand.
-2. **Human path.** On `/book`, complete Who you are → What you need → Pick a slot → Confirm. You get a booking id. Slots show remaining capacity (`N of 3 left`).
-3. **Shared state.** In a WebMCP-capable browser, start the form as a human (enter a name). Ask the agent for `get_form_schema`. The name must already be there.
-4. **Agent path.** Ask the agent to finish the booking with `get_available_slots` and `book_slot`. The page should flip to the confirmation without a refresh hack.
-5. **Lookup.** Call `get_booking_status` with the email or booking id. It matches what the UI shows.
-6. **No OAuth.** Do all of the above with `CALENDAR_PROVIDER=file`. The Google adapter is an env-gated stub (`src/lib/google-calendar.ts`) so a real Calendar API can drop in behind `CalendarProvider` later.
-
-## WebMCP tools
-
-Registered one-at-a-time with `registerTool({ name, description, inputSchema, execute, annotations }, { signal })`. `execute` receives `(args, { signal })` and forwards `signal` to `fetch`.
-
-| Tool | Writes? | Input | Result |
-| --- | --- | --- | --- |
-| `get_form_schema` | read | `sessionId?` | Steps, fields, validation rules, current values, booking if any |
-| `get_available_slots` | read | `from?` `to?` | 30-min slots with `remaining` > 0 |
-| `submit_step` | write | `stepId`, `values`, `sessionId?` | Validates, persists, advances; UI updates |
-| `book_slot` | write | `slotId`, `values?`, `sessionId?` | Calendar event + stored submission + confirmation state |
-| `get_booking_status` | read | `email?` or `bookingId?` | Matching bookings |
-
-Human UI and tools share the Next.js route handlers under `/api/*` and a session in SQLite.
+Enable `chrome://flags/#enable-webmcp-testing`, open `/lab` or `/book`, and list tools through Chrome, not the REST API.
 
 ## Design tokens
 
-The form is styled only with `--inh-*` CSS variables (color, radius, type, spacing, shadow). A host can:
+The form is styled with `--inh-*` variables. Pass `atelier`, `northline`, `inherit`, or `host`.
 
-1. Pass a preset: `inherit` · `atelier` · `northline`
-2. Pass a tokens object (`colors`, `radius`, `typography`, `spacing`, `shadows`)
-3. Set the CSS variables on a parent — they inherit, including into the web component’s shadow tree
+`theme="inherit"` on `<inherit-form>` samples the parent font, color, surface, radius, and button/input chrome. React `preset="host"` does the same. Explicit presets still win when you want a locked look.
 
 ```html
-<script type="module" src="https://your-host/inherit-embed.js"></script>
-<inherit-form
-  theme="atelier"
-  tokens='{"colors":{"primary":"#b8431f"},"radius":{"md":"4px"}}'
-></inherit-form>
+<script type="module" src="/inherit-embed.js"></script>
+<inherit-form theme="atelier"></inherit-form>
 ```
 
-Same-origin React hosts use `<InheritForm preset="northline" />`.
+## Booking demo details
 
-## Booking + storage
+These are demonstration constraints, not the product:
 
-- **Slots:** 30 minutes, weekdays 9–5 Pacific, lunch hour closed, default capacity **3**.
-- **CalendarProvider:** `listSlots`, `getSlot`, `createEvent`, `getEvent`.
-- **File provider:** deterministic working hours + seeded occupancy + SQLite-backed events. Demo works with zero OAuth.
-- **Google provider:** env-based stub. Set `CALENDAR_PROVIDER=google` plus `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID` when you wire `events.insert` / `freebusy`.
-- **Store:** `InheritStore` interface, SQLite (`better-sqlite3`) implementation. Swap the store without touching the form.
+- 30-minute slots, weekdays 9–5 Pacific, lunch closed
+- default capacity 3
+- file calendar with seeded occupancy
+- Google adapter remains an env-gated stub
 
-Local DB lives in `./data/inherit.db` (gitignored). On Vercel it uses `/tmp/inherit`.
-
-## Project shape
-
-```
-src/app/book                 top-level form (ChatGPT URL)
-src/app/demo/atelier         warm host
-src/app/demo/northline       sharp host
-src/app/api                  schema, step, slots, book, booking
-src/lib/calendar.ts          CalendarProvider
-src/lib/file-calendar.ts     deterministic demo calendar
-src/lib/google-calendar.ts   env stub
-src/lib/sqlite-store.ts      swappable persistence
-src/lib/inherit-tools.ts     WebMCP tool definitions
-public/inherit-embed.js      <inherit-form> script
-```
+Local DB is `./data/inherit.db`. On Vercel it is `/tmp/inherit` unless `INHERIT_DATA_DIR` is set.
 
 ## Out of scope
 
-Visual form builder, payments, teams, CRM, extra calendar vendors, and email confirmation.
+Visual form builder, payments, teams, CRM, extra calendar vendors, email, Google OAuth.
 
 ## License
 
