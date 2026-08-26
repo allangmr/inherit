@@ -77,13 +77,15 @@ function timeLabel(slot: Slot) {
 export function InheritForm({
   preset = "inherit",
   compact = false,
+  sessionKey,
 }: {
   preset?: TokenPreset;
   compact?: boolean;
+  sessionKey?: string;
 }) {
   const sessionId = useSyncExternalStore(
     () => () => {},
-    readSessionId,
+    () => readSessionId(sessionKey),
     () => "",
   );
   const [stepId, setStepId] = useState(formDefinition.steps[0].id);
@@ -97,15 +99,15 @@ export function InheritForm({
   const applyState = useCallback((payload: unknown) => {
     const next = extractState(payload);
     if (!next) return;
-    writeSessionId(next.session.id);
+    writeSessionId(next.session.id, sessionKey);
     setStepId(next.session.currentStepId);
     setValues(next.session.values ?? {});
     setBooking(next.booking ?? null);
     if (next.session.bookingId) setStepId("confirm");
-  }, []);
+  }, [sessionKey]);
 
   useEffect(() => {
-    const id = readSessionId();
+    const id = readSessionId(sessionKey);
     let cancelled = false;
 
     async function bootSession() {
@@ -125,6 +127,8 @@ export function InheritForm({
     bootSession();
     const onSync = (event: Event) => {
       const detail = (event as CustomEvent).detail;
+      const next = extractState(detail);
+      if (next && next.session.id !== id) return;
       applyState(detail);
       void apiFetch<{ slots: Slot[] }>("/api/slots").then((data) => setSlots(data.slots ?? []));
     };
@@ -133,7 +137,7 @@ export function InheritForm({
       cancelled = true;
       window.removeEventListener(INHERIT_STATE_EVENT, onSync);
     };
-  }, [applyState]);
+  }, [applyState, sessionKey]);
 
   useEffect(() => {
     if (!sessionId || boot) return;
