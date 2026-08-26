@@ -1,16 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { readSessionId, writeSessionId } from "@/lib/session-id";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { apiFetch, INHERIT_TOOL_EVENT, type ToolTrace } from "@inherit/webmcp";
 import {
-  apiFetch,
-  INHERIT_STATE_EVENT,
-  INHERIT_TOOL_EVENT,
-  type ToolTrace,
-} from "@/lib/webmcp";
+  InheritProvider,
+  extractState,
+  useActivity,
+  useAvailableActions,
+  useSession,
+  useWorkflow,
+  type ClientWorkflowState,
+} from "@inherit/react";
 import type { TokenPreset } from "@/lib/tokens";
-import type { ActivityRecord, FieldProvenance, ProposalRecord } from "@/lib/store";
-import type { Capability } from "@/lib/workflow/types";
+import type { FieldProvenance } from "@inherit/core";
 import { TokenScope } from "./token-scope";
 import { WebMcpBridge } from "./webmcp-bridge";
 import { ActivityRail } from "./activity-rail";
@@ -26,69 +28,7 @@ type Slot = {
   capacity: number;
 };
 
-type FormField = {
-  id: string;
-  type: string;
-  label: string;
-  hint?: string;
-  placeholder?: string;
-  options?: Array<{ value: string; label: string; description?: string }>;
-};
-
-type FormStep = {
-  id: string;
-  title: string;
-  subtitle: string;
-  fields: FormField[];
-};
-
-type WorkflowState = {
-  workflow: { id: string; version: number; title: string; description: string };
-  form: {
-    id: string;
-    title: string;
-    description: string;
-    steps: FormStep[];
-  };
-  session: {
-    id: string;
-    workflowId: string;
-    currentStepId: string;
-    values: Record<string, string | boolean | undefined>;
-    completedStepIds: string[];
-    bookingId: string | null;
-    version: number;
-    provenance: Record<string, FieldProvenance>;
-    status: string;
-  };
-  booking?: {
-    id: string;
-    label?: string;
-    start: string;
-    end: string;
-    name: string;
-    email: string;
-    slotId: string;
-    status: string;
-    calendarEventId: string;
-    calendarProvider: string;
-  } | null;
-  proposal?: ProposalRecord | null;
-  capabilities?: Capability[];
-  capabilityNames?: string[];
-  activity?: ActivityRecord[];
-};
-
 type FieldError = { fieldId: string; message: string };
-
-function extractState(payload: unknown): WorkflowState | null {
-  if (!payload || typeof payload !== "object") return null;
-  const root = payload as Record<string, unknown>;
-  const nested = (root.state ?? root) as Record<string, unknown>;
-  const session = nested.session as WorkflowState["session"] | undefined;
-  if (!session?.id) return null;
-  return nested as unknown as WorkflowState;
-}
 
 function groupSlots(slots: Slot[]) {
   const groups = new Map<string, Slot[]>();
@@ -176,16 +116,36 @@ export function InheritForm({
   registerTools?: boolean;
   workflowId?: string;
 }) {
-  const sessionId = useSyncExternalStore(
-    () => () => {},
-    () => readSessionId(sessionKey),
-    () => "",
+  return (
+    <InheritProvider workflowId={workflowId} sessionKey={sessionKey}>
+      <InheritFormView
+        preset={preset}
+        compact={compact}
+        registerTools={registerTools}
+        workflowId={workflowId}
+      />
+    </InheritProvider>
   );
-  const [state, setState] = useState<WorkflowState | null>(null);
+}
+
+function InheritFormView({
+  preset,
+  compact,
+  registerTools,
+  workflowId,
+}: {
+  preset: TokenPreset;
+  compact: boolean;
+  registerTools: boolean;
+  workflowId: string;
+}) {
+  const { sessionId, boot, state, applyState, setState } = useSession();
+  const { workflow } = useWorkflow();
+  const capabilities = useAvailableActions();
+  const activity = useActivity();
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [busy, setBusy] = useState(false);
-  const [boot, setBoot] = useState(true);
   const inspectStore = useSyncExternalStore(
     (onChange) => {
       window.addEventListener("popstate", onChange);
@@ -207,98 +167,51 @@ export function InheritForm({
   const successRef = useRef<HTMLHeadingElement>(null);
   const [transition, setTransition] = useState<{ from: string; to: string } | null>(null);
 
-  const applyState = useCallback(
-    (payload: unknown) => {
-      const next = extractState(payload);
-      if (!next?.session?.id) return;
-      writeSessionId(next.session.id, sessionKey);
-      const nextNames = next.capabilityNames ?? next.capabilities?.map((cap) => cap.name) ?? [];
-      const prev = previousCaps.current;
-      if (prev.length && nextNames.join() !== prev.join()) {
-        setCapSnapshot(prev);
-      }
-      previousCaps.current = nextNames;
-      const previousLabel = bookingLabelRef.current;
-      if (
-        next.booking?.label &&
-        previousLabel &&
-        next.booking.label !== previousLabel &&
-        next.activity?.at(-1)?.actor === "agent"
-      ) {
-        setFlash("Updated by ChatGPT");
-        setTransition({ from: previousLabel, to: next.booking.label });
-        window.setTimeout(() => {
-          setFlash(null);
-          setTransition(null);
-        }, 3200);
-      }
-      bookingLabelRef.current = next.booking?.label;
-      setState(next);
-    },
-    [sessionKey],
-  );
+  const rememberState = applyState;
 
   useEffect(() => {
-    const id = readSessionId(sessionKey);
-    let cancelled = false;
-
-    async function bootSession() {
-      try {
-        const [schema, slotData] = await Promise.all([
-          apiFetch<WorkflowState>(
-            `/api/form/schema?sessionId=${encodeURIComponent(id)}&workflowId=${encodeURIComponent(workflowId)}`,
-          ),
-          workflowId === "booking" ? apiFetch<{ slots: Slot[] }>("/api/slots") : Promise.resolve({ slots: [] }),
-        ]);
-        if (cancelled) return;
-        applyState(schema);
-        setSlots(slotData.slots ?? []);
-      } finally {
-        if (!cancelled) setBoot(false);
-      }
+    if (!state) return;
+    const nextNames = state.capabilityNames ?? capabilities.map((cap) => cap.name);
+    const prev = previousCaps.current;
+    if (prev.length && nextNames.join() !== prev.join()) {
+      setCapSnapshot(prev);
     }
+    previousCaps.current = nextNames;
+    const previousLabel = bookingLabelRef.current;
+    if (
+      state.booking?.label &&
+      previousLabel &&
+      state.booking.label !== previousLabel &&
+      state.activity?.at(-1)?.actor === "agent"
+    ) {
+      setFlash("Updated by ChatGPT");
+      setTransition({ from: previousLabel, to: state.booking.label });
+      window.setTimeout(() => {
+        setFlash(null);
+        setTransition(null);
+      }, 3200);
+    }
+    bookingLabelRef.current = state.booking?.label;
+  }, [state, capabilities]);
 
-    bootSession();
-    const onSync = (event: Event) => {
-      const detail = (event as CustomEvent).detail;
-      const next = extractState(detail);
-      if (next && next.session.id !== id && next.session.id !== sessionId) return;
-      applyState(detail);
-      if (workflowId === "booking") {
-        void apiFetch<{ slots: Slot[] }>("/api/slots").then((data) => setSlots(data.slots ?? []));
-      }
+  useEffect(() => {
+    if (workflowId !== "booking") return;
+    let cancelled = false;
+    void apiFetch<{ slots: Slot[] }>("/api/slots").then((data) => {
+      if (!cancelled) setSlots(data.slots ?? []);
+    });
+    return () => {
+      cancelled = true;
     };
+  }, [workflowId, state?.session.version]);
+
+  useEffect(() => {
     const onTool = (event: Event) => {
       setLastTool((event as CustomEvent<ToolTrace>).detail);
     };
-    window.addEventListener(INHERIT_STATE_EVENT, onSync);
     window.addEventListener(INHERIT_TOOL_EVENT, onTool);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(INHERIT_STATE_EVENT, onSync);
-      window.removeEventListener(INHERIT_TOOL_EVENT, onTool);
-    };
-  }, [applyState, sessionKey, workflowId, sessionId]);
-
-  const seenVersion = useRef(0);
-  seenVersion.current = state?.session.version ?? seenVersion.current;
-
-  useEffect(() => {
-    if (!sessionId || boot) return;
-    const tick = window.setInterval(() => {
-      void apiFetch<WorkflowState>(
-        `/api/form/schema?sessionId=${encodeURIComponent(sessionId)}&workflowId=${encodeURIComponent(workflowId)}`,
-      ).then((schema) => {
-        const next = extractState(schema);
-        if (!next || next.session.version === seenVersion.current) return;
-        applyState(schema);
-        if (workflowId === "booking") {
-          void apiFetch<{ slots: Slot[] }>("/api/slots").then((data) => setSlots(data.slots ?? []));
-        }
-      });
-    }, 2000);
-    return () => window.clearInterval(tick);
-  }, [sessionId, boot, workflowId, applyState]);
+    return () => window.removeEventListener(INHERIT_TOOL_EVENT, onTool);
+  }, []);
 
   const values = useMemo(() => state?.session.values ?? {}, [state?.session.values]);
   const stepId = state?.session.currentStepId;
@@ -308,7 +221,7 @@ export function InheritForm({
     const handle = window.setTimeout(() => {
       if (!dirtyRef.current) return;
       dirtyRef.current = false;
-      void apiFetch<WorkflowState>("/api/form/step", {
+      void apiFetch<ClientWorkflowState>("/api/form/step", {
         method: "POST",
         body: JSON.stringify({ sessionId, workflowId, values, draft: true }),
       })
@@ -336,7 +249,7 @@ export function InheritForm({
         });
     }, 350);
     return () => window.clearTimeout(handle);
-  }, [sessionId, values, boot, workflowId]);
+  }, [sessionId, values, boot, workflowId, setState]);
 
   useEffect(() => {
     if (state?.session.status === "booked") {
@@ -378,7 +291,7 @@ export function InheritForm({
           payload,
         }),
       });
-      applyState(result);
+      rememberState(result);
       setErrors((result.errors as FieldError[]) ?? []);
       if (workflowId === "booking") {
         const slotData = await apiFetch<{ slots: Slot[] }>("/api/slots");
@@ -421,7 +334,7 @@ export function InheritForm({
         return;
       }
       setErrors([]);
-      applyState(result);
+      rememberState(result);
     } catch (error) {
       setErrors([{ fieldId: "form", message: error instanceof Error ? error.message : "Request failed" }]);
     } finally {
@@ -441,8 +354,6 @@ export function InheritForm({
   }
 
   const selectedSlot = slots.find((slot) => slot.id === values.slotId);
-  const capabilities = state?.capabilities ?? [];
-  const activity = state?.activity ?? [];
   const proposal = state?.proposal ?? null;
   const provenance = state?.session.provenance ?? {};
   const showOverrideSlots =
@@ -461,12 +372,14 @@ export function InheritForm({
           }}
         >
           <div className="inh-kicker">
-            <span>{compact ? state?.workflow.title ?? "Workflow" : state?.workflow.title ?? "Inherit"}</span>
+            <span>{compact ? workflow?.title ?? "Workflow" : workflow?.title ?? "Inherit"}</span>
             <WebMcpBridge
               sessionId={sessionId || "pending"}
               workflowId={workflowId}
               enabled={registerTools}
-              capabilityNames={state?.capabilityNames ?? []}
+              capabilities={capabilities}
+              schemaToolName={state?.workflow.schemaToolName ?? (workflowId === "brief" ? "get_brief_schema" : "get_form_schema")}
+              submitToolName={state?.workflow.submitToolName ?? (workflowId === "brief" ? "update_brief" : "submit_step")}
             />
           </div>
           <h1 className="inh-title">{state?.form.title ?? "Loading"}</h1>

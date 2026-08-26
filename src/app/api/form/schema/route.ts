@@ -1,4 +1,4 @@
-import { getWorkflowState } from "@/lib/workflow/session";
+import { getWorkflowState } from "@/lib/inherit-runtime";
 import { errorResponse, json } from "@/lib/http";
 
 export const dynamic = "force-dynamic";

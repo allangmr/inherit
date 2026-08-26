@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import type { ActivityRecord, ProposalRecord } from "@/lib/store";
-import type { Capability } from "@/lib/workflow/types";
-import type { ToolTrace } from "@/lib/webmcp";
-import { capabilityDelta } from "@/lib/workflow/capabilities";
+import type { Capability } from "@inherit/core";
+import type { ToolTrace } from "@inherit/webmcp";
+import { capabilityDelta } from "@inherit/core";
 import { ArchitectureDiagram } from "./architecture-diagram";
 
 type InspectorProps = {

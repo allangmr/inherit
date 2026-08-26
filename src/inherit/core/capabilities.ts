@@ -1,6 +1,6 @@
 import type { Capability, CapabilitySnapshot, WorkflowDefinition } from "./types";
 
-export function getAvailableTools(
+export function getAvailableActions(
   workflow: WorkflowDefinition,
   snapshot: CapabilitySnapshot,
 ): Capability[] {
@@ -55,6 +55,8 @@ export function getAvailableTools(
 
   return tools;
 }
+
+export const getAvailableTools = getAvailableActions;
 
 export function capabilityNames(tools: Capability[]) {
   return tools.map((tool) => tool.name);

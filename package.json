@@ -3,12 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
+  "exports": {
+    "./core": "./src/inherit/core/index.ts",
+    "./react": "./src/inherit/react/index.tsx",
+    "./webmcp": "./src/inherit/webmcp/index.ts"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/lib/*.test.ts src/lib/**/*.test.ts"
+    "test": "tsx --test src/lib/*.test.ts src/lib/**/*.test.ts src/inherit/**/*.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

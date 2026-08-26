@@ -21,8 +21,8 @@ export default function HomePage() {
             One workflow. Shared by humans and agents.
           </h1>
           <p className="mt-6 text-lg leading-8 text-[#b8b3c9]">
-            Inherit turns a web workflow into an interface people and AI agents complete together.
-            Same state. Same validation. Same permissions. No second agent API.
+            Inherit is an SDK for web workflows that people and AI agents complete together.
+            Same state. Same validation. Same permissions. Booking is one demo app built with it.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link

@@ -1,5 +1,5 @@
-import type { FormDefinition } from "@/lib/form-definition";
-import { defineWorkflow } from "@/lib/workflow/define";
+import type { FormDefinition } from "@inherit/core";
+import { defineWorkflow } from "@inherit/core";
 
 export const BRIEF_FORM_ID = "studio-project-brief";
 

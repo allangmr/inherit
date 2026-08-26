@@ -19,7 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@inherit/core": ["./src/inherit/core/index.ts"],
+      "@inherit/react": ["./src/inherit/react/index.tsx"],
+      "@inherit/webmcp": ["./src/inherit/webmcp/index.ts"]
     }
   },
   "include": [

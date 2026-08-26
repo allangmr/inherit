@@ -10,6 +10,4 @@ export function errorResponse(message: string, status = 400, extra?: Record<stri
   return json({ ok: false, error: message, ...extra }, status);
 }
 
-export function isStale(error: unknown) {
-  return Boolean(error && typeof error === "object" && (error as { name?: string }).name === "StaleSessionError");
-}
+export { isStale } from "@inherit/core";

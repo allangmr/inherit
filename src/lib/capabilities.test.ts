@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getAvailableTools, capabilityDelta } from "./capabilities";
-import { bookingWorkflow } from "../workflows/booking";
-import { briefWorkflow } from "../workflows/brief";
-import type { CapabilitySnapshot } from "./types";
+import { getAvailableActions, capabilityDelta, type CapabilitySnapshot } from "@inherit/core";
+import { bookingWorkflow } from "./workflows/booking";
+import { briefWorkflow } from "./workflows/brief";
 
 function snap(overrides: Partial<CapabilitySnapshot> = {}): CapabilitySnapshot {
   return {
@@ -11,7 +10,7 @@ function snap(overrides: Partial<CapabilitySnapshot> = {}): CapabilitySnapshot {
     currentStepId: "identity",
     values: {},
     completedStepIds: [],
-    bookingStatus: "none",
+    recordStatus: "none",
     hasProposal: false,
     ...overrides,
   };
@@ -19,12 +18,12 @@ function snap(overrides: Partial<CapabilitySnapshot> = {}): CapabilitySnapshot {
 
 describe("dynamic capabilities", () => {
   it("exposes schema and submit before identity exists", () => {
-    const names = getAvailableTools(bookingWorkflow, snap()).map((tool) => tool.name);
+    const names = getAvailableActions(bookingWorkflow, snap()).map((tool) => tool.name);
     assert.deepEqual(names.sort(), ["get_form_schema", "submit_step"].sort());
   });
 
   it("adds slot tools after identity exists", () => {
-    const names = getAvailableTools(
+    const names = getAvailableActions(
       bookingWorkflow,
       snap({
         currentStepId: "need",
@@ -42,7 +41,7 @@ describe("dynamic capabilities", () => {
   });
 
   it("replaces book_slot with reschedule and cancel after a confirmed booking", () => {
-    const before = getAvailableTools(
+    const before = getAvailableActions(
       bookingWorkflow,
       snap({
         values: {
@@ -53,10 +52,10 @@ describe("dynamic capabilities", () => {
         },
       }),
     ).map((tool) => tool.name);
-    const after = getAvailableTools(
+    const after = getAvailableActions(
       bookingWorkflow,
       snap({
-        bookingStatus: "confirmed",
+        recordStatus: "confirmed",
         values: {
           name: "Ada Lovelace",
           email: "ada@example.com",
@@ -75,7 +74,7 @@ describe("dynamic capabilities", () => {
   });
 
   it("uses the brief tool names on the studio workflow", () => {
-    const names = getAvailableTools(briefWorkflow, snap({ workflowId: "brief" })).map(
+    const names = getAvailableActions(briefWorkflow, snap({ workflowId: "brief" })).map(
       (tool) => tool.name,
     );
     assert.ok(names.includes("get_brief_schema"));

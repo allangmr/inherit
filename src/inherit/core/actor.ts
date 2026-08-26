@@ -1,4 +1,4 @@
-import type { Actor } from "@/lib/store";
+import type { Actor } from "./models";
 
 export function parseActor(raw: unknown): Actor {
   if (raw === "agent" || raw === "system") return raw;
@@ -11,4 +11,10 @@ export function actorFromRequest(request: Request): Actor {
 
 export function actorHeaders(actor: Actor): HeadersInit {
   return { "x-inherit-actor": actor };
+}
+
+export function spokenActor(actor: Actor) {
+  if (actor === "agent") return "ChatGPT";
+  if (actor === "system") return "System";
+  return "You";
 }
