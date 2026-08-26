@@ -9,7 +9,7 @@ process.env.INHERIT_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "inherit-ru
 process.env.CALENDAR_PROVIDER = "file";
 
 import { bookSlot, listAvailableSlots, submitStep } from "./booking-service";
-import { resetStoreForTests } from "./sqlite-store";
+import { getStore, resetStoreForTests } from "./sqlite-store";
 import {
   dispatchAction,
   getWorkflowState,
@@ -230,6 +230,15 @@ describe("workflow runtime", () => {
     assert.equal(booked.ok, true);
     const state = getWorkflowState(sessionId);
     assert.equal(state.booking?.slotId, humanSlot.id);
+  });
+
+  it("does not persist a missing session on schema reads", () => {
+    const sessionId = `ghost-${crypto.randomUUID()}`;
+    const state = getWorkflowState(sessionId);
+    assert.equal(state.session.id, sessionId);
+    assert.equal(state.session.version, 1);
+    assert.deepEqual(state.session.values, {});
+    assert.equal(getStore().getSession(sessionId), null);
   });
 
   it("does not bump the session version when a draft has no changes", () => {

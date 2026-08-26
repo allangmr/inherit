@@ -234,7 +234,7 @@ function InheritFormView({
               ...current,
               session: {
                 ...current.session,
-                version: next.session.version,
+                version: Math.max(current.session.version, next.session.version),
                 provenance: next.session.provenance,
               },
               activity: next.activity ?? current.activity,
@@ -291,6 +291,12 @@ function InheritFormView({
           payload,
         }),
       });
+      if (result.ok === false) {
+        setErrors(
+          (result.errors as FieldError[]) ?? [{ fieldId: "form", message: "Request failed" }],
+        );
+        return;
+      }
       rememberState(result);
       setErrors((result.errors as FieldError[]) ?? []);
       if (workflowId === "booking") {
@@ -401,7 +407,9 @@ function InheritFormView({
             </nav>
           ) : null}
 
-          {errorMap.form ? <p className="inh-error">{errorMap.form}</p> : null}
+          {errorMap.form || errorMap.action ? (
+            <p className="inh-error">{errorMap.form ?? errorMap.action}</p>
+          ) : null}
           {flash ? (
             <p className="inh-flash" role="status">
               {flash}
