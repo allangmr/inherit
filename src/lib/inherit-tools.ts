@@ -5,6 +5,25 @@ import { apiFetch, broadcastFormState } from "./webmcp";
 
 type SessionGetter = () => string;
 
+function asArgs(raw: unknown): Record<string, unknown> {
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  if (raw && typeof raw === "object") return raw as Record<string, unknown>;
+  return {};
+}
+
+function asSignal(extras: unknown) {
+  if (extras && typeof extras === "object" && "signal" in extras) {
+    return (extras as { signal?: AbortSignal }).signal;
+  }
+  return undefined;
+}
+
 function resultPayload(data: unknown) {
   return JSON.stringify(data);
 }
@@ -32,7 +51,9 @@ export function createInheritTools(getSessionId: SessionGetter): ModelContextToo
           },
         },
       },
-      execute: async (args, { signal }) => {
+      execute: async (raw, extras) => {
+        const args = asArgs(raw);
+        const signal = asSignal(extras);
         const sessionId = String(args.sessionId ?? getSessionId());
         const data = await apiFetch(`/api/form/schema?sessionId=${encodeURIComponent(sessionId)}`, {
           signal,
@@ -59,7 +80,9 @@ export function createInheritTools(getSessionId: SessionGetter): ModelContextToo
           },
         },
       },
-      execute: async (args, { signal }) => {
+      execute: async (raw, extras) => {
+        const args = asArgs(raw);
+        const signal = asSignal(extras);
         const params = new URLSearchParams();
         if (args.from) params.set("from", String(args.from));
         if (args.to) params.set("to", String(args.to));
@@ -94,7 +117,9 @@ export function createInheritTools(getSessionId: SessionGetter): ModelContextToo
           },
         },
       },
-      execute: async (args, { signal }) => {
+      execute: async (raw, extras) => {
+        const args = asArgs(raw);
+        const signal = asSignal(extras);
         const data = await apiFetch("/api/form/step", {
           method: "POST",
           signal,
@@ -145,7 +170,9 @@ export function createInheritTools(getSessionId: SessionGetter): ModelContextToo
           },
         },
       },
-      execute: async (args, { signal }) => {
+      execute: async (raw, extras) => {
+        const args = asArgs(raw);
+        const signal = asSignal(extras);
         const data = await apiFetch("/api/book", {
           method: "POST",
           signal,
@@ -178,7 +205,9 @@ export function createInheritTools(getSessionId: SessionGetter): ModelContextToo
           },
         },
       },
-      execute: async (args, { signal }) => {
+      execute: async (raw, extras) => {
+        const args = asArgs(raw);
+        const signal = asSignal(extras);
         if (!args.email && !args.bookingId) {
           return resultPayload({
             ok: false,

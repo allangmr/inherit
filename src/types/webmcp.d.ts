@@ -21,8 +21,8 @@ export type ModelContextTool = {
   description: string;
   inputSchema: JsonSchema;
   execute: (
-    args: Record<string, unknown>,
-    extras: { signal: AbortSignal },
+    args: Record<string, unknown> | string,
+    extras?: { signal?: AbortSignal },
   ) => Promise<unknown> | unknown;
   annotations?: {
     readOnlyHint?: boolean;
