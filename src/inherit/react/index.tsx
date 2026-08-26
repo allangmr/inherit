@@ -13,6 +13,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { ActivityRecord, Capability, FieldProvenance, ProposalRecord } from "@inherit/core";
+import { reconcilePolledState } from "./reconcile";
 
 const EMPTY_CAPABILITIES: Capability[] = [];
 const EMPTY_ACTIVITY: ActivityRecord[] = [];
@@ -193,9 +194,10 @@ export function InheritProvider({
         const next = extractState(schema);
         if (!next) return;
         setState((current) => {
-          if (current && next.session.version === current.session.version) return current;
-          writeSessionId(next.session.id, sessionKey);
-          return next;
+          const reconciled = reconcilePolledState(current, next);
+          if (reconciled === current) return current;
+          writeSessionId(reconciled.session.id, sessionKey);
+          return reconciled;
         });
       });
     }, 2000);
@@ -260,4 +262,4 @@ export function useActivity() {
   return state?.activity ?? EMPTY_ACTIVITY;
 }
 
-export { InheritContext, useInheritContext };
+export { InheritContext, useInheritContext, reconcilePolledState };

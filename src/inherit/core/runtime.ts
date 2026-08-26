@@ -89,7 +89,13 @@ export class WorkflowRuntime {
   }
 
   getState(sessionId?: string | null, workflowId?: string | null): WorkflowState {
-    const session = this.ensureSession(sessionId, workflowId);
+    const requestedId = sessionId?.trim() ?? "";
+    const existing = requestedId ? this.store.getSession(requestedId) : null;
+    const session =
+      existing ??
+      (requestedId
+        ? emptySession(requestedId, this.getWorkflow(workflowId))
+        : this.ensureSession(sessionId, workflowId));
     const workflow = this.getWorkflow(session.workflowId);
     const capabilities = this.getAvailableActions(session);
     const state: WorkflowState = {
