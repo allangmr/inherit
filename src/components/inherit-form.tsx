@@ -240,7 +240,9 @@ export function InheritForm({
 
         {errorMap.form ? <p className="inh-error">{errorMap.form}</p> : null}
 
-        {booked && booking ? (
+        {boot ? (
+          <p className="inh-subtitle">Loading your session…</p>
+        ) : booked && booking ? (
           <div className="inh-success">
             <h2>You&apos;re on the calendar.</h2>
             <p>

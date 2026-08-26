@@ -83,9 +83,17 @@ class InheritFormElement extends HTMLElement {
   }
 
   async #boot(root) {
-    await this.#load();
     this.#render(root);
-    await this.#registerTools();
+    try {
+      await this.#load();
+      this.#render(root);
+      await this.#registerTools();
+    } catch (error) {
+      const subtitle = root.querySelector(".inh-subtitle");
+      if (subtitle) {
+        subtitle.textContent = error instanceof Error ? error.message : "Failed to load form";
+      }
+    }
   }
 
   async #load() {

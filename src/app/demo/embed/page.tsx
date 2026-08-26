@@ -1,5 +1,5 @@
+import Script from "next/script";
 import Link from "next/link";
-import { InheritElement } from "@/components/inherit-element";
 
 export const metadata = {
   title: "Script-tag embed · Inherit",
@@ -8,6 +8,7 @@ export const metadata = {
 export default function EmbedDemoPage() {
   return (
     <div className="inherit-hero min-h-screen px-6 py-10 text-[#f4f1ea]">
+      <Script src="/inherit-embed.js" type="module" strategy="afterInteractive" />
       <div className="mx-auto max-w-xl">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#f0c38e]">
           &lt;inherit-form&gt; · no iframe
@@ -20,9 +21,12 @@ export default function EmbedDemoPage() {
             Back to Inherit
           </Link>
         </p>
-        <div className="mt-8">
-          <InheritElement theme="inherit" />
-        </div>
+        <div
+          className="mt-8"
+          dangerouslySetInnerHTML={{
+            __html: '<inherit-form theme="inherit"></inherit-form>',
+          }}
+        />
       </div>
     </div>
   );

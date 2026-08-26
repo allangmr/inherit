@@ -16,7 +16,7 @@ type WebMcpBridgeProps = {
 };
 
 function initialStatus(): WebMcpStatus {
-  if (typeof window === "undefined") return "registering";
+  if (typeof window === "undefined") return "unavailable";
   const context = getModelContext();
   if (!context || !isSecureContextForWebMcp()) return "unavailable";
   return "registering";
