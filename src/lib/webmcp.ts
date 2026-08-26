@@ -46,15 +46,17 @@ export async function listRegisteredTools() {
 
 export async function executeRegisteredTool(name: string, args: Record<string, unknown> = {}) {
   const input = JSON.stringify(args);
-  const producer = getModelContext();
-  const tools = await listRegisteredTools();
-  const match = tools.find((tool) => tool.name === name);
-  if (producer?.executeTool && match) {
-    return producer.executeTool(match, input);
-  }
   const testing = getModelContextTesting();
+  // Chrome 146–149: navigator.modelContextTesting.executeTool(name, json)
   if (testing?.executeTool) {
-    return testing.executeTool(match ?? name, input);
+    return testing.executeTool(name, input);
+  }
+  const producer = getModelContext();
+  if (producer?.executeTool) {
+    const tools = await listRegisteredTools();
+    const match = tools.find((tool) => tool.name === name);
+    if (!match) throw new Error(`Tool not found: ${name}`);
+    return producer.executeTool(match, input);
   }
   throw new Error(
     "Chrome WebMCP consumer API is missing. Enable chrome://flags/#enable-webmcp-testing and relaunch.",
