@@ -65,6 +65,20 @@ describe("docs site", () => {
     assert.equal(page.includes("registry.npmjs"), false);
   });
 
+  it("opens with what this is for and architecture diagrams", () => {
+    const page = read("src/app/docs/page.tsx");
+    const charts = read("src/lib/docs/diagrams.ts");
+    assert.match(page, /What this is for/);
+    assert.match(page, /human UI, and a separate agent API/);
+    assert.match(page, /web developers shipping an agent-native workflow/);
+    assert.match(page, /one <code>WorkflowDefinition<\/code>/);
+    assert.match(page, /MermaidDiagram/);
+    assert.match(charts, /WorkflowDefinition/);
+    assert.match(charts, /@inherit\/core/);
+    assert.match(charts, /\/api\/form\/schema/);
+    assert.match(charts, /book_slot gone/);
+  });
+
   it("links / and /docs in the site nav and landing", () => {
     const nav = read("src/components/site-nav.tsx");
     const landing = read("src/components/landing/docs-landing.tsx");

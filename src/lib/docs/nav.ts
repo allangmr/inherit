@@ -10,7 +10,7 @@ export const DOC_PAGES: DocPage[] = [
     href: "/docs",
     label: "Overview",
     title: "Inherit SDK",
-    blurb: "What the SDK is, the one-runtime thesis, and when to use it.",
+    blurb: "What this is for, who it is for, and four architecture diagrams.",
   },
   {
     href: "/docs/install",
