@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./inherit-form.css";
+@import "./docs-landing.css";
 
 :root {
   --background: #0f1220;

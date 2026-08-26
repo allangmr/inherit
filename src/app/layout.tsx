@@ -43,9 +43,9 @@ const ibmMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Inherit. One workflow for humans and agents.",
+  title: "Inherit · SDK for shared human and agent workflows",
   description:
-    "A shared workflow runtime. People and AI agents complete the same steps against the same state, validation, and domain actions.",
+    "In-repo TypeScript SDK. One WorkflowDefinition drives the human UI, WebMCP tools, validation, and domain actions. Not on npm. MIT.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
