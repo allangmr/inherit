@@ -1,49 +1,13 @@
-export type Actor = "human" | "agent" | "system";
+import type { WorkflowStore } from "@inherit/core";
 
-export type FieldProvenance = {
-  actor: Actor;
-  at: string;
-  source: "input" | "tool" | "proposal" | "system";
-};
-
-export type ProposalRecord = {
-  id: string;
-  action: string;
-  toolName?: string;
-  actor: Actor;
-  summary: string;
-  payload: Record<string, unknown>;
-  status: "pending";
-  createdAt: string;
-};
-
-export type ActivityRecord = {
-  id: string;
-  sessionId: string;
-  timestamp: string;
-  actor: Actor;
-  action: string;
-  field?: string;
-  previousValue?: unknown;
-  nextValue?: unknown;
-  toolName?: string;
-  summary: string;
-};
-
-export type SessionRecord = {
-  id: string;
-  workflowId: string;
-  formId: string;
-  currentStepId: string;
-  values: Record<string, string | boolean | undefined>;
-  completedStepIds: string[];
-  bookingId: string | null;
-  version: number;
-  provenance: Record<string, FieldProvenance>;
-  proposal: ProposalRecord | null;
-  createdAt: string;
-  updatedAt: string;
-};
+export type {
+  Actor,
+  ActivityRecord,
+  FieldProvenance,
+  ProposalRecord,
+  SessionRecord,
+  WorkflowStore,
+} from "@inherit/core";
 
 export type BookingRecord = {
   id: string;
@@ -73,10 +37,7 @@ export type CalendarEventRecord = {
   createdAt: string;
 };
 
-export interface InheritStore {
-  getSession(id: string): SessionRecord | null;
-  upsertSession(session: SessionRecord): SessionRecord;
-  compareAndSetSession(session: SessionRecord, expectedVersion: number): SessionRecord | null;
+export interface InheritStore extends WorkflowStore {
   getBooking(id: string): BookingRecord | null;
   findBookings(query: { email?: string; bookingId?: string }): BookingRecord[];
   createBooking(booking: BookingRecord): BookingRecord;
@@ -87,6 +48,4 @@ export interface InheritStore {
   updateCalendarEvent(event: CalendarEventRecord): CalendarEventRecord;
   deleteCalendarEvent(id: string): void;
   getCalendarEvent(id: string): CalendarEventRecord | null;
-  appendActivity(entry: ActivityRecord): ActivityRecord;
-  listActivity(sessionId: string, limit?: number): ActivityRecord[];
 }

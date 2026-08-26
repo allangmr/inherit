@@ -1,5 +1,5 @@
-import { actorFromRequest } from "@/lib/workflow/actor";
-import { saveDraft, submitWorkflowStep } from "@/lib/workflow/runtime";
+import { actorFromRequest } from "@inherit/core";
+import { saveDraft, submitWorkflowStep } from "@/lib/inherit-runtime";
 import { errorResponse, isStale, json, readJson } from "@/lib/http";
 
 export const dynamic = "force-dynamic";

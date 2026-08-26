@@ -5,7 +5,7 @@ import {
   executeRegisteredTool,
   listRegisteredTools,
   probeWebMcp,
-} from "@/lib/webmcp";
+} from "@inherit/webmcp";
 import type { RegisteredTool } from "@/types/webmcp";
 
 const scripts: Array<{ name: string; label: string; args: Record<string, unknown> }> = [

@@ -4,6 +4,8 @@ One workflow. Shared by humans and agents.
 
 Inherit turns a website workflow into an interface that people and AI agents complete together. One definition drives the human UI, WebMCP capabilities, validation, and domain actions. There is no second agent API.
 
+The reusable surface is an SDK (`src/inherit/core`, `react`, `webmcp`). The appointment and brief demos are apps that consume it.
+
 Built for the [OpenAI WebMCP Challenge](https://openai.com) (August 25–September 3, 2026). MIT licensed.
 
 ## Why
@@ -104,13 +106,18 @@ It shows session id, workflow, step, version, booking id, the live capability li
 
 ## Architecture
 
+Inherit is the reusable runtime. Booking is one app built with it.
+
 ```
-src/lib/workflow/           definition, capabilities, session, dispatch
+src/inherit/core/           defineWorkflow, runtime, capabilities, session
+src/inherit/react/          InheritProvider and hooks
+src/inherit/webmcp/         WebMCP adapter over the runtime
 src/lib/workflows/booking.ts
 src/lib/workflows/brief.ts
+src/lib/demo/action-handlers.ts
 src/lib/booking-service.ts  calendar domain (book, reschedule, cancel)
 src/lib/sqlite-store.ts     sessions, bookings, activity
-src/lib/inherit-tools.ts    WebMCP executors
+src/lib/inherit-runtime.ts  demo wiring: store + handlers + decorate
 src/components/inherit-form.tsx
 src/components/activity-rail.tsx
 src/components/inherit-inspector.tsx

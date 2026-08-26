@@ -1,6 +1,9 @@
 import { formDefinition } from "@/lib/form-definition";
-import { defineWorkflow } from "@/lib/workflow/define";
-import { hasIdentity } from "@/lib/workflow/types";
+import { defineWorkflow, type FormValues } from "@inherit/core";
+
+export function hasIdentity(values: FormValues) {
+  return String(values.name ?? "").trim().length >= 2 && String(values.email ?? "").includes("@");
+}
 
 export const bookingWorkflow = defineWorkflow({
   id: "booking",
@@ -14,7 +17,7 @@ export const bookingWorkflow = defineWorkflow({
   submitToolName: "submit_step",
   submitToolDescription:
     "Validate and persist one step, then advance. Same path as the human UI. Use stepId identity | need | slot | confirm.",
-  submitAvailable: (snapshot) => snapshot.bookingStatus !== "confirmed",
+  submitAvailable: (snapshot) => snapshot.recordStatus !== "confirmed",
   actions: [
     {
       name: "get_available_slots",
@@ -23,7 +26,7 @@ export const bookingWorkflow = defineWorkflow({
       readOnly: true,
       requiresConfirmation: false,
       available: (snapshot) =>
-        hasIdentity(snapshot.values) || snapshot.bookingStatus !== "none",
+        hasIdentity(snapshot.values) || snapshot.recordStatus !== "none",
       inputSchema: {
         type: "object",
         additionalProperties: false,
@@ -40,7 +43,7 @@ export const bookingWorkflow = defineWorkflow({
       readOnly: false,
       requiresConfirmation: false,
       available: (snapshot) =>
-        hasIdentity(snapshot.values) && snapshot.bookingStatus !== "confirmed",
+        hasIdentity(snapshot.values) && snapshot.recordStatus !== "confirmed",
       inputSchema: {
         type: "object",
         additionalProperties: false,
@@ -59,7 +62,7 @@ export const bookingWorkflow = defineWorkflow({
       readOnly: false,
       requiresConfirmation: false,
       available: (snapshot) =>
-        hasIdentity(snapshot.values) && snapshot.bookingStatus !== "confirmed",
+        hasIdentity(snapshot.values) && snapshot.recordStatus !== "confirmed",
       inputSchema: {
         type: "object",
         additionalProperties: false,
@@ -75,7 +78,7 @@ export const bookingWorkflow = defineWorkflow({
       description: "Look up bookings by email or booking id.",
       readOnly: true,
       requiresConfirmation: false,
-      available: (snapshot) => snapshot.bookingStatus !== "none",
+      available: (snapshot) => snapshot.recordStatus !== "none",
       inputSchema: {
         type: "object",
         additionalProperties: false,
@@ -91,7 +94,7 @@ export const bookingWorkflow = defineWorkflow({
         "Move an existing confirmed booking to a different free slot. Updates the shared session so the open page follows.",
       readOnly: false,
       requiresConfirmation: false,
-      available: (snapshot) => snapshot.bookingStatus === "confirmed",
+      available: (snapshot) => snapshot.recordStatus === "confirmed",
       inputSchema: {
         type: "object",
         additionalProperties: false,
@@ -107,7 +110,7 @@ export const bookingWorkflow = defineWorkflow({
       description: "Cancel the confirmed booking. Agent calls create a proposal the human can confirm.",
       readOnly: false,
       requiresConfirmation: true,
-      available: (snapshot) => snapshot.bookingStatus === "confirmed",
+      available: (snapshot) => snapshot.recordStatus === "confirmed",
       inputSchema: {
         type: "object",
         additionalProperties: false,

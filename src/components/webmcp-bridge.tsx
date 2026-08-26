@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createWorkflowTools, toolsNamed } from "@/lib/inherit-tools";
+import { useEffect, useRef, useState } from "react";
+import type { Capability } from "@inherit/core";
 import {
+  createWebMcpAdapter,
   getModelContext,
   isSecureContextForWebMcp,
-  registerTools,
+  registerWorkflowTools,
   type WebMcpStatus,
-} from "@/lib/webmcp";
+} from "@inherit/webmcp";
 import { WebMcpIndicator } from "./webmcp-indicator";
 
 type WebMcpBridgeProps = {
@@ -15,7 +16,9 @@ type WebMcpBridgeProps = {
   workflowId?: string;
   exposedTo?: string[];
   enabled?: boolean;
-  capabilityNames?: string[];
+  capabilities?: Capability[];
+  schemaToolName?: string;
+  submitToolName?: string;
 };
 
 function initialStatus(enabled: boolean): WebMcpStatus {
@@ -30,10 +33,17 @@ export function WebMcpBridge({
   workflowId = "booking",
   exposedTo,
   enabled = true,
-  capabilityNames = [],
+  capabilities = [],
+  schemaToolName = "get_form_schema",
+  submitToolName = "submit_step",
 }: WebMcpBridgeProps) {
   const [status, setStatus] = useState<WebMcpStatus>(() => initialStatus(enabled));
-  const namesKey = capabilityNames.join(",");
+  const namesKey = capabilities.map((capability) => capability.name).join(",");
+  const capabilitiesRef = useRef(capabilities);
+
+  useEffect(() => {
+    capabilitiesRef.current = capabilities;
+  }, [capabilities]);
 
   useEffect(() => {
     if (!enabled || sessionId === "pending") return;
@@ -44,17 +54,17 @@ export function WebMcpBridge({
       return () => controller.abort();
     }
 
-    const catalog = createWorkflowTools(
-      () => sessionId,
-      () => workflowId,
-    );
-    const fallback =
-      workflowId === "brief"
-        ? ["get_brief_schema", "update_brief"]
-        : ["get_form_schema", "submit_step"];
-    const selected = toolsNamed(catalog, namesKey ? namesKey.split(",") : fallback);
+    const adapter = createWebMcpAdapter({
+      getSessionId: () => sessionId,
+      getWorkflowId: () => workflowId,
+    });
 
-    registerTools(selected, { signal: controller.signal, exposedTo })
+    registerWorkflowTools(
+      adapter,
+      capabilitiesRef.current,
+      { schemaToolName, submitToolName },
+      { signal: controller.signal, exposedTo },
+    )
       .then((result) => {
         if (!controller.signal.aborted) {
           setStatus(result.supported ? "ready" : "unavailable");
@@ -65,7 +75,7 @@ export function WebMcpBridge({
       });
 
     return () => controller.abort();
-  }, [sessionId, workflowId, exposedTo, enabled, namesKey]);
+  }, [sessionId, workflowId, exposedTo, enabled, namesKey, schemaToolName, submitToolName]);
 
   return <WebMcpIndicator status={status} />;
 }

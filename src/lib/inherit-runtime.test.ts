@@ -3,15 +3,19 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, describe, it } from "node:test";
+import { StaleSessionError } from "@inherit/core";
 
 process.env.INHERIT_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "inherit-runtime-"));
 process.env.CALENDAR_PROVIDER = "file";
 
-import { bookSlot, listAvailableSlots, submitStep } from "../booking-service";
-import { resetStoreForTests } from "../sqlite-store";
-import { dispatchAction, saveDraft, submitWorkflowStep } from "./runtime";
-import { getWorkflowState } from "./session";
-import { StaleSessionError } from "./stale";
+import { bookSlot, listAvailableSlots, submitStep } from "./booking-service";
+import { resetStoreForTests } from "./sqlite-store";
+import {
+  dispatchAction,
+  getWorkflowState,
+  saveDraft,
+  submitWorkflowStep,
+} from "./inherit-runtime";
 
 describe("workflow runtime", () => {
   beforeEach(() => {
