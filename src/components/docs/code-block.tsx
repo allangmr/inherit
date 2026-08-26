@@ -15,12 +15,24 @@ export function CodeBlock({
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        throw new Error("clipboard API missing");
+      }
     } catch {
-      setCopied(false);
+      const field = document.createElement("textarea");
+      field.value = code;
+      field.setAttribute("readonly", "");
+      field.style.position = "fixed";
+      field.style.left = "-9999px";
+      document.body.append(field);
+      field.select();
+      document.execCommand("copy");
+      field.remove();
     }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
   }
 
   return (
