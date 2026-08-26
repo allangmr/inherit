@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DemoSwitcher } from "@/components/demo-switcher";
 import { HostSystem } from "@/components/host-system";
 import { InheritForm } from "@/components/inherit-form";
 
@@ -11,6 +12,7 @@ export const metadata = {
 export default function ComparePage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#f4f1ea]">
+      <DemoSwitcher />
       <header className="border-b border-white/10 px-6 py-5 md:px-8">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#f0c38e]">
           Side-by-side · same component

@@ -59,3 +59,9 @@ a {
   color: #e8eef7;
   font-family: var(--font-ibm-plex), ui-sans-serif, system-ui, sans-serif;
 }
+
+.studio-page {
+  background: #08140f;
+  color: #e8f6ec;
+  font-family: var(--font-ibm-plex), ui-sans-serif, system-ui, sans-serif;
+}

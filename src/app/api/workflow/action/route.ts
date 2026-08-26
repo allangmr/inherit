@@ -4,33 +4,33 @@ import { errorResponse, isStale, json, readJson } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
-type BookBody = {
+type ActionBody = {
   sessionId?: string;
   workflowId?: string;
-  slotId?: string;
-  values?: Record<string, string | boolean | undefined>;
+  action?: string;
+  payload?: Record<string, unknown>;
   expectedVersion?: number;
 };
 
 export async function POST(request: Request) {
   try {
     const actor = actorFromRequest(request);
-    const body = await readJson<BookBody>(request);
-    if (!body.slotId) return errorResponse("slotId is required.");
+    const body = await readJson<ActionBody>(request);
+    if (!body.action) return errorResponse("action is required.");
     const result = await dispatchAction({
       sessionId: body.sessionId,
       workflowId: body.workflowId,
-      action: "book_slot",
+      action: body.action,
+      payload: body.payload ?? {},
       actor,
-      toolName: actor === "agent" ? "book_slot" : undefined,
+      toolName: actor === "agent" ? body.action : undefined,
       expectedVersion: body.expectedVersion,
-      payload: { slotId: body.slotId, values: body.values ?? {} },
     });
     return json(result, result.ok ? 200 : 422);
   } catch (error) {
     if (isStale(error)) {
       return errorResponse(error instanceof Error ? error.message : "Stale session", 409);
     }
-    return errorResponse(error instanceof Error ? error.message : "Failed to book slot", 500);
+    return errorResponse(error instanceof Error ? error.message : "Failed to run action", 500);
   }
 }

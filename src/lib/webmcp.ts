@@ -1,6 +1,8 @@
+import type { Actor } from "@/lib/store";
 import type { ModelContext, ModelContextTool } from "@/types/webmcp";
 
 export const INHERIT_STATE_EVENT = "inherit:state";
+export const INHERIT_TOOL_EVENT = "inherit:tool";
 
 export type WebMcpStatus = "ready" | "unavailable" | "registering" | "error";
 
@@ -47,7 +49,6 @@ export async function listRegisteredTools() {
 export async function executeRegisteredTool(name: string, args: Record<string, unknown> = {}) {
   const input = JSON.stringify(args);
   const testing = getModelContextTesting();
-  // Chrome 146–149: navigator.modelContextTesting.executeTool(name, json)
   if (testing?.executeTool) {
     return testing.executeTool(name, input);
   }
@@ -72,20 +73,37 @@ export function broadcastFormState(detail: unknown) {
   window.dispatchEvent(new CustomEvent(INHERIT_STATE_EVENT, { detail }));
 }
 
+export type ToolTrace = {
+  name: string;
+  input: unknown;
+  result: unknown;
+  durationMs: number;
+  actor: Actor;
+  timestamp: string;
+};
+
+export function broadcastToolTrace(detail: ToolTrace) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(INHERIT_TOOL_EVENT, { detail }));
+}
+
 export async function apiFetch<T>(
   path: string,
-  init: RequestInit & { signal?: AbortSignal } = {},
+  init: RequestInit & { signal?: AbortSignal; actor?: Actor } = {},
 ): Promise<T> {
+  const { actor = "human", ...requestInit } = init;
   const response = await fetch(path, {
-    ...init,
+    ...requestInit,
     headers: {
       "content-type": "application/json",
-      ...(init.headers ?? {}),
+      "x-inherit-actor": actor,
+      ...(requestInit.headers ?? {}),
     },
-    signal: init.signal,
+    signal: requestInit.signal,
   });
-  const data = (await response.json()) as T & { error?: string; ok?: boolean };
-  if (!response.ok && data.ok !== false && !("errors" in (data as object))) {
+  const data = (await response.json()) as T & { error?: string; ok?: boolean; errors?: unknown };
+  if (!response.ok) {
+    if (Array.isArray(data.errors) && data.errors.length) return data;
     throw new Error(data.error ?? `Request failed (${response.status})`);
   }
   return data;

@@ -1,4 +1,7 @@
-import type { CSSProperties, ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { sampleHostTokens } from "@/lib/host-tokens";
 import {
   mergeTokens,
   tokenPresets,
@@ -12,7 +15,6 @@ type TokenScopeProps = {
   tokens?: Partial<DesignTokens>;
   children: ReactNode;
   className?: string;
-  as?: "div" | "section" | "main";
 };
 
 export function TokenScope({
@@ -20,13 +22,23 @@ export function TokenScope({
   tokens,
   children,
   className,
-  as: Tag = "div",
 }: TokenScopeProps) {
-  const resolved = mergeTokens(tokenPresets[preset], tokens);
-  const style = tokensToCssVars(resolved) as CSSProperties;
+  const ref = useRef<HTMLDivElement>(null);
+  const [hostVars, setHostVars] = useState<Record<string, string>>({});
+  const resolved = mergeTokens(tokenPresets[preset] ?? tokenPresets.inherit, tokens);
+  const style = {
+    ...tokensToCssVars(resolved),
+    ...(preset === "host" ? hostVars : {}),
+  } as CSSProperties;
+
+  useEffect(() => {
+    if (preset !== "host") return;
+    setHostVars(sampleHostTokens(ref.current?.parentElement ?? null));
+  }, [preset]);
+
   return (
-    <Tag className={`inh-root ${className ?? ""}`.trim()} style={style}>
+    <div ref={ref} className={`inh-root ${className ?? ""}`.trim()} style={style}>
       {children}
-    </Tag>
+    </div>
   );
 }

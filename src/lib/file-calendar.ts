@@ -8,6 +8,7 @@ import type {
   CalendarProvider,
   CreateEventInput,
   TimeSlot,
+  UpdateEventInput,
 } from "./calendar";
 import { getStore } from "./sqlite-store";
 import {
@@ -84,6 +85,26 @@ export class FileCalendarProvider implements CalendarProvider {
       createdAt,
     });
     return event;
+  }
+
+  async updateEvent(input: UpdateEventInput): Promise<CalendarEvent> {
+    const store = getStore();
+    const existing = store.getCalendarEvent(input.id);
+    const createdAt = existing?.createdAt ?? new Date().toISOString();
+    return store.updateCalendarEvent({
+      id: input.id,
+      slotId: input.slotId,
+      start: input.start,
+      end: input.end,
+      title: input.title,
+      attendeeEmail: input.attendeeEmail,
+      attendeeName: input.attendeeName,
+      createdAt,
+    });
+  }
+
+  async cancelEvent(eventId: string): Promise<void> {
+    getStore().deleteCalendarEvent(eventId);
   }
 
   async getEvent(eventId: string): Promise<CalendarEvent | null> {

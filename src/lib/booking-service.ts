@@ -1,86 +1,49 @@
 import { FORM_ID } from "./config";
-import { formDefinition, nextStepId, validateAll, validateStep } from "./form-definition";
+import { formDefinition, nextStepId, validateAll, validateStep, type FormValues } from "./form-definition";
 import { getCalendarProvider, describeCalendar } from "./providers";
 import { getStore } from "./sqlite-store";
-import type { BookingRecord, SessionRecord } from "./store";
+import type { Actor, BookingRecord, SessionRecord } from "./store";
 import { formatSlotRange } from "./time";
+import { getWorkflow } from "./workflows/registry";
+import {
+  bumpSession,
+  ensureSession,
+  getWorkflowState,
+  mergeProvenance,
+  recordActivity,
+} from "./workflow/session";
+import { StaleSessionError } from "./workflow/stale";
 
 function nowIso() {
   return new Date().toISOString();
 }
 
+function asString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export function emptySession(id: string): SessionRecord {
+  const workflow = getWorkflow("booking");
   return {
     id,
+    workflowId: workflow.id,
     formId: FORM_ID,
-    currentStepId: formDefinition.steps[0].id,
+    currentStepId: workflow.form.steps[0].id,
     values: {},
     completedStepIds: [],
     bookingId: null,
+    version: 1,
+    provenance: {},
+    proposal: null,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
 }
 
-export function ensureSession(sessionId?: string | null) {
-  const store = getStore();
-  const id = sessionId?.trim() || crypto.randomUUID();
-  return store.getSession(id) ?? store.upsertSession(emptySession(id));
-}
+export { ensureSession, getWorkflowState, StaleSessionError };
 
-export function getFormState(sessionId?: string | null) {
-  const session = ensureSession(sessionId);
-  const booking = session.bookingId ? getStore().getBooking(session.bookingId) : null;
-  return {
-    form: {
-      id: formDefinition.id,
-      title: formDefinition.title,
-      description: formDefinition.description,
-      durationMinutes: formDefinition.durationMinutes,
-      timezone: formDefinition.timezone,
-      location: formDefinition.location,
-      steps: formDefinition.steps.map((step, index) => ({
-        id: step.id,
-        index,
-        title: step.title,
-        subtitle: step.subtitle,
-        fields: step.fields.map((field) => ({
-          id: field.id,
-          type: field.type,
-          label: field.label,
-          hint: field.hint,
-          placeholder: field.placeholder,
-          options: field.options,
-          validation: field.rules,
-        })),
-      })),
-    },
-    session: {
-      id: session.id,
-      currentStepId: session.currentStepId,
-      values: session.values,
-      completedStepIds: session.completedStepIds,
-      bookingId: session.bookingId,
-      status: booking ? "booked" : "in_progress",
-    },
-    booking,
-    calendar: describeCalendar(),
-  };
-}
-
-export function saveDraft(
-  sessionId: string,
-  values: Record<string, string | boolean | undefined>,
-) {
-  const store = getStore();
-  const session = ensureSession(sessionId);
-  const next = {
-    ...session,
-    values: { ...session.values, ...values },
-    updatedAt: nowIso(),
-  };
-  store.upsertSession(next);
-  return getFormState(session.id);
+export function getFormState(sessionId?: string | null, workflowId?: string | null) {
+  return getWorkflowState(sessionId, workflowId);
 }
 
 export function submitStep(
@@ -89,25 +52,25 @@ export function submitStep(
   values: Record<string, string | boolean | undefined>,
 ) {
   const session = ensureSession(sessionId);
+  const workflow = getWorkflow(session.workflowId);
   const merged = { ...session.values, ...values };
-  const errors = validateStep(stepId, merged);
+  const errors = validateStep(stepId, merged, workflow.form);
   if (errors.length) {
     return {
       ok: false as const,
       errors,
-      state: getFormState(session.id),
+      state: getWorkflowState(session.id),
     };
   }
 
   const completed = new Set(session.completedStepIds);
   completed.add(stepId);
-  const upcoming = nextStepId(stepId);
-  getStore().upsertSession({
-    ...session,
+  const upcoming = nextStepId(stepId, workflow.form);
+  bumpSession(session, {
     values: merged,
     completedStepIds: [...completed],
     currentStepId: upcoming ?? stepId,
-    updatedAt: nowIso(),
+    provenance: mergeProvenance(session, values, "human", "input"),
   });
 
   return {
@@ -115,13 +78,16 @@ export function submitStep(
     errors: [],
     advancedTo: upcoming,
     completed: !upcoming,
-    state: getFormState(session.id),
+    state: getWorkflowState(session.id),
   };
 }
 
 export async function listAvailableSlots(input?: { from?: string; to?: string }) {
   const calendar = getCalendarProvider();
-  const slots = await calendar.listSlots(input);
+  const slots = await calendar.listSlots({
+    from: input?.from || undefined,
+    to: input?.to || undefined,
+  });
   return {
     provider: calendar.name,
     timezone: formDefinition.timezone,
@@ -131,30 +97,50 @@ export async function listAvailableSlots(input?: { from?: string; to?: string })
   };
 }
 
-function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
 export async function bookSlot(input: {
   sessionId?: string;
   slotId: string;
   values?: Record<string, string | boolean | undefined>;
+  actor?: Actor;
+  expectedVersion?: number;
+  toolName?: string;
 }) {
   const store = getStore();
   const calendar = getCalendarProvider();
+  const actor = input.actor ?? "human";
   const session = ensureSession(input.sessionId);
-  const values: Record<string, string | boolean | undefined> = {
+  const values: FormValues = {
     ...session.values,
+    service: session.values.service || input.values?.service || "first_consult",
+    format: session.values.format || input.values?.format || "video",
     ...input.values,
     slotId: input.slotId,
+    consent: input.values?.consent ?? session.values.consent ?? true,
   };
 
-  const errors = validateAll({ ...values, consent: values.consent ?? true });
-  const identityErrors = errors.filter((error) =>
-    ["name", "email", "slotId"].includes(error.fieldId),
-  );
+  if (session.bookingId) {
+    const existing = store.getBooking(session.bookingId);
+    if (existing?.status === "confirmed" && existing.slotId === input.slotId) {
+      return {
+        ok: true as const,
+        errors: [],
+        booking: { ...existing, label: formatSlotRange(existing.start, existing.end) },
+        state: getWorkflowState(session.id),
+      };
+    }
+    if (existing?.status === "confirmed") {
+      return {
+        ok: false as const,
+        errors: [{ fieldId: "slotId", message: "This session already has a booking. Reschedule it instead." }],
+        state: getWorkflowState(session.id),
+      };
+    }
+  }
+
+  const errors = validateAll({ ...values, consent: values.consent ?? true }, formDefinition);
+  const identityErrors = errors.filter((error) => ["name", "email", "slotId"].includes(error.fieldId));
   if (identityErrors.length) {
-    return { ok: false as const, errors: identityErrors, state: getFormState(session.id) };
+    return { ok: false as const, errors: identityErrors, state: getWorkflowState(session.id) };
   }
 
   const slot = await calendar.getSlot(input.slotId);
@@ -162,14 +148,14 @@ export async function bookSlot(input: {
     return {
       ok: false as const,
       errors: [{ fieldId: "slotId", message: "That slot is not on the calendar." }],
-      state: getFormState(session.id),
+      state: getWorkflowState(session.id),
     };
   }
   if (slot.remaining <= 0) {
     return {
       ok: false as const,
       errors: [{ fieldId: "slotId", message: "That slot is full. Pick another time." }],
-      state: getFormState(session.id),
+      state: getWorkflowState(session.id),
     };
   }
 
@@ -199,16 +185,30 @@ export async function bookSlot(input: {
     calendarProvider: calendar.name,
     status: "confirmed",
     createdAt,
+    updatedAt: createdAt,
   };
 
   store.createBooking(booking);
-  store.upsertSession({
-    ...session,
-    values,
-    currentStepId: "confirm",
-    completedStepIds: formDefinition.steps.map((step) => step.id),
-    bookingId,
-    updatedAt: createdAt,
+  bumpSession(
+    session,
+    {
+      values,
+      currentStepId: "confirm",
+      completedStepIds: formDefinition.steps.map((step) => step.id),
+      bookingId,
+      proposal: null,
+      provenance: mergeProvenance(session, { slotId: slot.id }, actor, input.toolName ? "tool" : "input"),
+    },
+    input.expectedVersion,
+  );
+  recordActivity({
+    sessionId: session.id,
+    actor,
+    action: "book_slot",
+    toolName: input.toolName,
+    field: "slotId",
+    nextValue: slot.label,
+    summary: `${actor === "agent" ? "ChatGPT" : "You"} booked ${slot.label}`,
   });
 
   return {
@@ -218,7 +218,151 @@ export async function bookSlot(input: {
       ...booking,
       label: formatSlotRange(booking.start, booking.end),
     },
-    state: getFormState(session.id),
+    state: getWorkflowState(session.id),
+  };
+}
+
+export async function rescheduleBooking(input: {
+  sessionId: string;
+  slotId: string;
+  actor?: Actor;
+  expectedVersion?: number;
+  toolName?: string;
+}) {
+  const store = getStore();
+  const calendar = getCalendarProvider();
+  const actor = input.actor ?? "human";
+  const session = ensureSession(input.sessionId);
+  if (!session.bookingId) {
+    return {
+      ok: false as const,
+      errors: [{ fieldId: "booking", message: "There is no active booking to reschedule." }],
+      state: getWorkflowState(session.id),
+    };
+  }
+  const booking = store.getBooking(session.bookingId);
+  if (!booking || booking.status !== "confirmed") {
+    return {
+      ok: false as const,
+      errors: [{ fieldId: "booking", message: "There is no active booking to reschedule." }],
+      state: getWorkflowState(session.id),
+    };
+  }
+
+  const slot = await calendar.getSlot(input.slotId);
+  if (!slot) {
+    return {
+      ok: false as const,
+      errors: [{ fieldId: "slotId", message: "That slot is not on the calendar." }],
+      state: getWorkflowState(session.id),
+    };
+  }
+  if (slot.id !== booking.slotId && slot.remaining <= 0) {
+    return {
+      ok: false as const,
+      errors: [{ fieldId: "slotId", message: "That slot is full. Pick another time." }],
+      state: getWorkflowState(session.id),
+    };
+  }
+
+  const previousLabel = formatSlotRange(booking.start, booking.end);
+  await calendar.updateEvent({
+    id: booking.calendarEventId,
+    slotId: slot.id,
+    start: slot.start,
+    end: slot.end,
+    title: `${formDefinition.title} · ${booking.name}`,
+    attendeeEmail: booking.email,
+    attendeeName: booking.name,
+  });
+
+  const updated: BookingRecord = {
+    ...booking,
+    slotId: slot.id,
+    start: slot.start,
+    end: slot.end,
+    values: { ...booking.values, slotId: slot.id },
+    updatedAt: nowIso(),
+  };
+  store.updateBooking(updated);
+  bumpSession(
+    session,
+    {
+      values: { ...session.values, slotId: slot.id },
+      proposal: null,
+      provenance: mergeProvenance(session, { slotId: slot.id }, actor, input.toolName ? "tool" : "input"),
+    },
+    input.expectedVersion,
+  );
+  recordActivity({
+    sessionId: session.id,
+    actor,
+    action: "reschedule_booking",
+    toolName: input.toolName,
+    field: "slotId",
+    previousValue: previousLabel,
+    nextValue: slot.label,
+    summary:
+      actor === "agent"
+        ? `ChatGPT rescheduled ${previousLabel} → ${slot.label}`
+        : `You moved the booking to ${slot.label}`,
+  });
+
+  return {
+    ok: true as const,
+    errors: [],
+    booking: { ...updated, label: slot.label, previousLabel },
+    state: getWorkflowState(session.id),
+  };
+}
+
+export async function cancelBooking(input: {
+  sessionId: string;
+  actor?: Actor;
+  expectedVersion?: number;
+  toolName?: string;
+}) {
+  const store = getStore();
+  const actor = input.actor ?? "human";
+  const session = ensureSession(input.sessionId);
+  if (!session.bookingId) {
+    return {
+      ok: false as const,
+      errors: [{ fieldId: "booking", message: "There is no booking to cancel." }],
+      state: getWorkflowState(session.id),
+    };
+  }
+  const booking = store.getBooking(session.bookingId);
+  if (!booking || booking.status !== "confirmed") {
+    return {
+      ok: false as const,
+      errors: [{ fieldId: "booking", message: "There is no active booking to cancel." }],
+      state: getWorkflowState(session.id),
+    };
+  }
+
+  const updated: BookingRecord = {
+    ...booking,
+    status: "cancelled",
+    updatedAt: nowIso(),
+  };
+  store.updateBooking(updated);
+  const calendar = getCalendarProvider();
+  await calendar.cancelEvent(booking.calendarEventId);
+  bumpSession(session, { proposal: null }, input.expectedVersion);
+  recordActivity({
+    sessionId: session.id,
+    actor,
+    action: "cancel_booking",
+    toolName: input.toolName,
+    summary: actor === "agent" ? "ChatGPT cancelled the booking" : "You cancelled the booking",
+  });
+
+  return {
+    ok: true as const,
+    errors: [],
+    booking: { ...updated, label: formatSlotRange(updated.start, updated.end) },
+    state: getWorkflowState(session.id),
   };
 }
 
@@ -241,3 +385,87 @@ export function getBookingStatus(query: { email?: string; bookingId?: string }) 
     bookings,
   };
 }
+
+export function suggestBriefDeliverable(input: {
+  sessionId: string;
+  actor?: Actor;
+  expectedVersion?: number;
+  toolName?: string;
+}) {
+  const actor = input.actor ?? "agent";
+  const session = ensureSession(input.sessionId, "brief");
+  const goal = asString(session.values.goal).toLowerCase();
+  let deliverable = "landing_page";
+  let label = "Landing page";
+  if (goal.includes("system") || goal.includes("token") || goal.includes("component")) {
+    deliverable = "design_system";
+    label = "Design system";
+  } else if (goal.includes("proto") || goal.includes("flow") || goal.includes("click")) {
+    deliverable = "prototype";
+    label = "Prototype";
+  } else if (goal.includes("brand") || goal.includes("identity") || goal.includes("voice")) {
+    deliverable = "brand_refresh";
+    label = "Brand refresh";
+  }
+
+  const proposal = {
+    id: `pr_${crypto.randomUUID()}`,
+    action: "suggest_deliverables" as const,
+    toolName: input.toolName,
+    actor,
+    summary: `ChatGPT suggested ${label}`,
+    payload: { deliverable, label },
+    status: "pending" as const,
+    createdAt: nowIso(),
+  };
+  bumpSession(session, { proposal }, input.expectedVersion);
+  recordActivity({
+    sessionId: session.id,
+    actor,
+    action: "propose",
+    toolName: input.toolName,
+    field: "deliverable",
+    nextValue: label,
+    summary: proposal.summary,
+  });
+  return { ok: true as const, errors: [], proposal, state: getWorkflowState(session.id) };
+}
+
+export function submitProjectBrief(input: {
+  sessionId: string;
+  values?: Record<string, string | boolean | undefined>;
+  actor?: Actor;
+  expectedVersion?: number;
+  toolName?: string;
+}) {
+  const actor = input.actor ?? "human";
+  const session = ensureSession(input.sessionId, "brief");
+  const workflow = getWorkflow("brief");
+  const merged = { ...session.values, ...input.values, ready: true, submitted: true };
+  const required = validateAll(merged, workflow.form);
+  if (required.length) {
+    return { ok: false as const, errors: required, state: getWorkflowState(session.id) };
+  }
+
+  bumpSession(
+    session,
+    {
+      values: merged,
+      currentStepId: "review",
+      completedStepIds: workflow.form.steps.map((step) => step.id),
+      proposal: null,
+      provenance: mergeProvenance(session, merged, actor, input.toolName ? "tool" : "input"),
+    },
+    input.expectedVersion,
+  );
+  recordActivity({
+    sessionId: session.id,
+    actor,
+    action: "submit_project_brief",
+    toolName: input.toolName,
+    summary: actor === "agent" ? "ChatGPT submitted the project brief" : "You submitted the project brief",
+  });
+  return { ok: true as const, errors: [], state: getWorkflowState(session.id) };
+}
+
+export { describeCalendar };

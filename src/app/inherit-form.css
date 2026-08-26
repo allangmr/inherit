@@ -341,6 +341,210 @@
   background: var(--inh-color-accent);
 }
 
+.inh-shell {
+  display: grid;
+  gap: var(--inh-space-md);
+}
+
+.inh-rail {
+  margin-top: var(--inh-space-lg);
+  border-top: 1px solid var(--inh-color-border);
+  padding-top: var(--inh-space-md);
+}
+
+.inh-rail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--inh-space-sm);
+  cursor: pointer;
+  list-style: none;
+}
+
+.inh-rail-head::-webkit-details-marker {
+  display: none;
+}
+
+.inh-rail-head span,
+.inh-rail-head strong {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--inh-font-mono);
+  color: var(--inh-color-text-muted);
+}
+
+.inh-rail-list {
+  list-style: none;
+  margin: var(--inh-space-sm) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.inh-rail-list li {
+  display: grid;
+  grid-template-columns: 4.4rem 1fr;
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.inh-actor {
+  font-family: var(--inh-font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  color: var(--inh-color-accent);
+}
+
+.inh-rail-list p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.inh-success h2:focus {
+  outline: 2px solid var(--inh-color-ring);
+  outline-offset: 4px;
+}
+
+.inh-transition {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.95rem;
+}
+
+.inh-proposal,
+.inh-flash,
+.inh-transition {
+  margin: var(--inh-space-md) 0;
+  padding: var(--inh-space-md);
+  border-radius: var(--inh-radius-md);
+  border: 1px solid color-mix(in srgb, var(--inh-color-accent) 45%, var(--inh-color-border));
+  background: color-mix(in srgb, var(--inh-color-accent) 12%, var(--inh-color-surface-muted));
+}
+
+.inh-inspector {
+  padding: var(--inh-space-md);
+  border: 1px solid var(--inh-color-border);
+  border-radius: var(--inh-radius-lg);
+  background: var(--inh-color-surface);
+  color: var(--inh-color-text);
+  font-size: 0.86rem;
+}
+
+.inh-inspector h3 {
+  margin: var(--inh-space-md) 0 0.35rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--inh-color-text-muted);
+}
+
+.inh-cap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.inh-cap-list em {
+  margin-left: 0.4rem;
+  color: var(--inh-color-text-muted);
+  font-style: normal;
+  font-size: 0.75em;
+}
+
+.inh-delta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.inh-delta span[data-kind="add"] {
+  color: var(--inh-color-success);
+}
+
+.inh-delta span[data-kind="remove"] {
+  color: var(--inh-color-danger);
+}
+
+.inh-json {
+  overflow: auto;
+  max-height: 12rem;
+  padding: 0.6rem;
+  background: var(--inh-color-surface-muted);
+  border-radius: var(--inh-radius-sm);
+  font-size: 0.74rem;
+}
+
+.inh-arch {
+  margin: 0 0 var(--inh-space-md);
+  display: grid;
+  gap: 0.35rem;
+  justify-items: stretch;
+}
+
+.inh-arch-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.inh-arch-node {
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--inh-color-border);
+  border-radius: var(--inh-radius-sm);
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.inh-arch-arrow {
+  text-align: center;
+  color: var(--inh-color-text-muted);
+}
+
+.inh-inspect-toggle {
+  appearance: none;
+  margin-top: var(--inh-space-md);
+  background: transparent;
+  color: var(--inh-color-text-muted);
+  border: 0;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.inh-switcher {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #0f1220 86%, transparent);
+  border: 1px solid rgba(244, 241, 234, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.inh-switcher a {
+  color: #f4f1ea;
+  text-decoration: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+}
+
+.inh-switcher a[data-active="true"] {
+  background: #7c5cff;
+}
+
 @media (max-width: 720px) {
   .inh-form {
     padding: var(--inh-space-lg) var(--inh-space-md);

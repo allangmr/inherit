@@ -1,15 +1,16 @@
-import Link from "next/link";
-import { HostSystem } from "@/components/host-system";
+import { DemoSwitcher } from "@/components/demo-switcher";
 import { InheritForm } from "@/components/inherit-form";
+import Link from "next/link";
 
 export const metadata = {
   title: "Northline · Schedule a consult",
-  description: "Sharp SaaS host demo. Inherit picks up hairline radius, electric blue, and dense type.",
+  description: "Sharp SaaS host demo. Same Inherit runtime, different tokens.",
 };
 
 export default function NorthlinePage() {
   return (
     <div className="northline-page min-h-screen">
+      <DemoSwitcher />
       <header className="flex items-center justify-between border-b border-white/10 px-6 py-4 md:px-8">
         <div className="flex items-center gap-3">
           <span className="grid h-7 w-7 place-items-center bg-[#2f6dff] text-[11px] font-semibold">
@@ -37,33 +38,14 @@ export default function NorthlinePage() {
             Clinic / 30:00
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em]">
-            Schedule intake without a second UI.
+            Same runtime. This host just happens to book intake.
           </h1>
           <p className="mt-4 max-w-md text-sm leading-6 text-[#8b97a8]">
-            Northline is the sharp-SaaS twin of Atelier Lumen. Same booking engine, same WebMCP
-            tools, different tokens: 2px corners, IBM Plex, and a near-black canvas.
+            Northline is the sharp-SaaS twin of Atelier Lumen. Same workflow engine, same WebMCP
+            capabilities, different tokens.
           </p>
-          <ul className="mt-8 space-y-3 font-mono text-xs text-[#8b97a8]">
-            <li className="flex justify-between border-b border-white/10 py-2">
-              <span>Provider</span>
-              <span className="text-[#e8eef7]">file calendar</span>
-            </li>
-            <li className="flex justify-between border-b border-white/10 py-2">
-              <span>Slot size</span>
-              <span className="text-[#e8eef7]">30 min</span>
-            </li>
-            <li className="flex justify-between border-b border-white/10 py-2">
-              <span>Concurrency</span>
-              <span className="text-[#e8eef7]">max 3</span>
-            </li>
-            <li className="flex justify-between border-b border-white/10 py-2">
-              <span>Agent surface</span>
-              <span className="text-[#3ee0c5]">5 tools / this document</span>
-            </li>
-          </ul>
         </section>
         <section>
-          <HostSystem preset="northline" client="Northline" />
           <InheritForm preset="northline" compact sessionKey="northline-host" />
         </section>
       </main>

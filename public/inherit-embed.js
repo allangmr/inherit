@@ -27,13 +27,51 @@ const STYLE = `
 .inh-success { padding: 1rem; border: 1px solid var(--inh-color-border, #ddd); border-radius: var(--inh-radius-md, 10px); }
 `;
 
-const TOOLS = [
-  ["get_form_schema", "Return the full multi-step Inherit booking form plus current session values.", { type: "object", properties: { sessionId: { type: "string" } } }, true],
-  ["get_available_slots", "List 30-minute slots with remaining capacity.", { type: "object", properties: { from: { type: "string" }, to: { type: "string" } } }, true],
-  ["submit_step", "Validate and persist one step, then advance.", { type: "object", required: ["stepId", "values"], properties: { sessionId: { type: "string" }, stepId: { type: "string", enum: ["identity", "need", "slot", "confirm"] }, values: { type: "object" } } }, false],
-  ["book_slot", "Book a slot, create the calendar event, store the submission.", { type: "object", required: ["slotId"], properties: { sessionId: { type: "string" }, slotId: { type: "string" }, values: { type: "object" } } }, false],
-  ["get_booking_status", "Look up bookings by email or booking id.", { type: "object", properties: { email: { type: "string" }, bookingId: { type: "string" } } }, true],
-];
+function inheritFetch(url, init = {}) {
+  const headers = { ...(init.headers || {}) };
+  if (init.body && !headers["content-type"]) headers["content-type"] = "application/json";
+  headers["x-inherit-actor"] = init.actor || "human";
+  return fetch(url, { ...init, headers });
+}
+
+function applyHostTheme(element) {
+  const parent = element.parentElement;
+  if (!parent || typeof getComputedStyle !== "function") return;
+  const host = getComputedStyle(parent);
+  const painted = (color) => color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent";
+  let background = host.backgroundColor;
+  let node = parent;
+  while (node && node !== document.documentElement) {
+    const color = getComputedStyle(node).backgroundColor;
+    if (painted(color)) {
+      background = color;
+      break;
+    }
+    node = node.parentElement;
+  }
+  if (host.fontFamily) element.style.setProperty("--inh-font-family", host.fontFamily);
+  if (host.color) element.style.setProperty("--inh-color-text", host.color);
+  if (painted(background)) {
+    element.style.setProperty("--inh-color-background", background);
+    element.style.setProperty("--inh-color-surface", background);
+  }
+  if (host.borderColor) element.style.setProperty("--inh-color-border", host.borderColor);
+  if (host.borderRadius) {
+    element.style.setProperty("--inh-radius-md", host.borderRadius);
+    element.style.setProperty("--inh-radius-lg", host.borderRadius);
+  }
+}
+
+const TOOLS = {
+  get_form_schema: ["Return the workflow, session values, and available capabilities.", { type: "object", properties: { sessionId: { type: "string" } } }, true],
+  get_available_slots: ["List 30-minute slots with remaining capacity.", { type: "object", properties: { from: { type: "string" }, to: { type: "string" } } }, true],
+  submit_step: ["Validate and persist one step, then advance.", { type: "object", required: ["stepId", "values"], properties: { sessionId: { type: "string" }, stepId: { type: "string" }, values: { type: "object" } } }, false],
+  propose_slot: ["Propose a slot without booking it.", { type: "object", required: ["slotId"], properties: { sessionId: { type: "string" }, slotId: { type: "string" } } }, false],
+  book_slot: ["Book the session's selected slot.", { type: "object", properties: { sessionId: { type: "string" }, slotId: { type: "string" }, values: { type: "object" } } }, false],
+  get_booking_status: ["Look up bookings by email or booking id.", { type: "object", properties: { email: { type: "string" }, bookingId: { type: "string" } } }, true],
+  reschedule_booking: ["Move a confirmed booking to another free slot.", { type: "object", required: ["slotId"], properties: { sessionId: { type: "string" }, slotId: { type: "string" } } }, false],
+  cancel_booking: ["Cancel the confirmed booking.", { type: "object", properties: { sessionId: { type: "string" } } }, false],
+};
 
 function modelContext() {
   return document.modelContext || navigator.modelContext || null;
@@ -44,6 +82,9 @@ class InheritFormElement extends HTMLElement {
   #state = { currentStepId: "identity", values: {}, booking: null };
   #slots = [];
   #abort = new AbortController();
+  #toolAbort = new AbortController();
+  #capabilities = ["get_form_schema", "submit_step"];
+  #toolsReady = false;
 
   static get observedAttributes() {
     return ["theme", "tokens", "session-id"];
@@ -52,6 +93,8 @@ class InheritFormElement extends HTMLElement {
   connectedCallback() {
     this.#sessionId = this.getAttribute("session-id") || this.#sessionId;
     const root = this.attachShadow({ mode: "open" });
+    const theme = this.getAttribute("theme");
+    if (theme === "inherit" || theme === "host") applyHostTheme(this);
     const tokens = this.getAttribute("tokens");
     if (tokens) {
       try {
@@ -71,15 +114,14 @@ class InheritFormElement extends HTMLElement {
         if (parsed.typography?.fontFamily) {
           this.style.setProperty("--inh-font-family", parsed.typography.fontFamily);
         }
-      } catch {
-        /* ignore invalid tokens JSON */
-      }
+      } catch {}
     }
     this.#boot(root);
   }
 
   disconnectedCallback() {
     this.#abort.abort();
+    this.#toolAbort.abort();
   }
 
   async #boot(root) {
@@ -98,8 +140,8 @@ class InheritFormElement extends HTMLElement {
 
   async #load() {
     const [schema, slots] = await Promise.all([
-      fetch(`/api/form/schema?sessionId=${this.#sessionId}`).then((r) => r.json()),
-      fetch("/api/slots").then((r) => r.json()),
+      inheritFetch(`/api/form/schema?sessionId=${this.#sessionId}`).then((r) => r.json()),
+      inheritFetch("/api/slots").then((r) => r.json()),
     ]);
     this.#apply(schema);
     this.#slots = slots.slots || [];
@@ -114,6 +156,11 @@ class InheritFormElement extends HTMLElement {
         values: nested.session.values || {},
         booking: nested.booking || null,
       };
+      const names = nested.capabilityNames || (nested.capabilities || []).map((cap) => cap.name);
+      if (Array.isArray(names) && names.length && names.join() !== this.#capabilities.join()) {
+        this.#capabilities = names;
+        if (this.#toolsReady) void this.#registerTools();
+      }
     }
   }
 
@@ -135,35 +182,52 @@ class InheritFormElement extends HTMLElement {
     };
     const exec = {
       get_form_schema: async (args, extras) =>
-        sync(await (await fetch(`/api/form/schema?sessionId=${args.sessionId || getSession()}`, { signal: extras && extras.signal })).json()),
+        sync(await (await inheritFetch(`/api/form/schema?sessionId=${args.sessionId || getSession()}`, { signal: extras && extras.signal, actor: "agent" })).json()),
       get_available_slots: async (args, extras) => {
         const q = new URLSearchParams();
         if (args.from) q.set("from", args.from);
         if (args.to) q.set("to", args.to);
-        const data = await (await fetch(`/api/slots?${q}`, { signal: extras && extras.signal })).json();
+        const data = await (await inheritFetch(`/api/workflow/action`, {
+          method: "POST",
+          actor: "agent",
+          signal: extras && extras.signal,
+          body: JSON.stringify({ sessionId: getSession(), action: "get_available_slots", payload: { from: args.from, to: args.to } }),
+        })).json();
         this.#slots = data.slots || [];
         this.#render(this.shadowRoot);
         return JSON.stringify(data);
       },
       submit_step: async (args, extras) =>
-        sync(await (await fetch("/api/form/step", { method: "POST", headers: { "content-type": "application/json" }, signal: extras && extras.signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), stepId: args.stepId, values: args.values || {} }) })).json()),
+        sync(await (await inheritFetch("/api/form/step", { method: "POST", actor: "agent", signal: extras && extras.signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), stepId: args.stepId, values: args.values || {} }) })).json()),
+      propose_slot: async (args, extras) =>
+        sync(await (await inheritFetch("/api/workflow/action", { method: "POST", actor: "agent", signal: extras && extras.signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), action: "propose_slot", payload: { slotId: args.slotId, note: args.note } }) })).json()),
       book_slot: async (args, extras) =>
-        sync(await (await fetch("/api/book", { method: "POST", headers: { "content-type": "application/json" }, signal: extras && extras.signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), slotId: args.slotId, values: args.values || {} }) })).json()),
+        sync(await (await inheritFetch("/api/workflow/action", { method: "POST", actor: "agent", signal: extras && extras.signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), action: "book_slot", payload: { slotId: args.slotId, values: args.values || {} } }) })).json()),
       get_booking_status: async (args, extras) => {
         const q = new URLSearchParams();
         if (args.email) q.set("email", args.email);
         if (args.bookingId) q.set("bookingId", args.bookingId);
-        return JSON.stringify(await (await fetch(`/api/booking?${q}`, { signal: extras && extras.signal })).json());
+        return JSON.stringify(await (await inheritFetch(`/api/booking?${q}`, { signal: extras && extras.signal, actor: "agent" })).json());
       },
+      reschedule_booking: async (args, extras) =>
+        sync(await (await inheritFetch("/api/workflow/action", { method: "POST", actor: "agent", signal: extras && extras.signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), action: "reschedule_booking", payload: { slotId: args.slotId } }) })).json()),
+      cancel_booking: async (args, extras) =>
+        sync(await (await inheritFetch("/api/workflow/action", { method: "POST", actor: "agent", signal: extras && extras.signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), action: "cancel_booking", payload: {} }) })).json()),
     };
-    for (const [name, description, inputSchema, readOnly] of TOOLS) {
+    this.#toolAbort.abort();
+    this.#toolAbort = new AbortController();
+    this.#toolsReady = true;
+    for (const name of this.#capabilities) {
+      const spec = TOOLS[name];
+      if (!spec || !exec[name]) continue;
+      const [description, inputSchema, readOnly] = spec;
       await ctx.registerTool({
         name,
         description,
         inputSchema,
         annotations: { readOnlyHint: readOnly },
         execute: exec[name],
-      }, { signal: this.#abort.signal });
+      }, { signal: this.#toolAbort.signal });
     }
     if (pill) {
       pill.dataset.state = "ready";
@@ -242,10 +306,10 @@ class InheritFormElement extends HTMLElement {
       });
       this.#state.values = nextValues;
       if (currentStepId === "confirm") {
-        const data = await (await fetch("/api/book", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionId: this.#sessionId, slotId: nextValues.slotId, values: nextValues }) })).json();
+        const data = await (await inheritFetch("/api/book", { method: "POST", body: JSON.stringify({ sessionId: this.#sessionId, slotId: nextValues.slotId, values: nextValues }) })).json();
         this.#apply(data);
       } else {
-        const data = await (await fetch("/api/form/step", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionId: this.#sessionId, stepId: currentStepId, values: nextValues }) })).json();
+        const data = await (await inheritFetch("/api/form/step", { method: "POST", body: JSON.stringify({ sessionId: this.#sessionId, stepId: currentStepId, values: nextValues }) })).json();
         this.#apply(data);
       }
       this.#render(root);
