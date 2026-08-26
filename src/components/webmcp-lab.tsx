@@ -24,7 +24,10 @@ const scripts: Array<{ name: string; label: string; args: Record<string, unknown
 
 export function WebMcpLab() {
   const probeSnapshot = useSyncExternalStore(
-    () => () => {},
+    (onStoreChange) => {
+      const timer = window.setInterval(onStoreChange, 400);
+      return () => window.clearInterval(timer);
+    },
     () => JSON.stringify(probeWebMcp()),
     () => "",
   );
