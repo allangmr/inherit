@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HostSystem } from "@/components/host-system";
 import { InheritForm } from "@/components/inherit-form";
 
 export const metadata = {
@@ -62,7 +63,8 @@ export default function NorthlinePage() {
           </ul>
         </section>
         <section>
-          <InheritForm preset="northline" compact />
+          <HostSystem preset="northline" client="Northline" />
+          <InheritForm preset="northline" compact sessionKey="northline-host" />
         </section>
       </main>
     </div>

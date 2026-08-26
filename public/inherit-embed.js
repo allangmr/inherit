@@ -134,26 +134,26 @@ class InheritFormElement extends HTMLElement {
       return typeof data === "string" ? data : JSON.stringify(data);
     };
     const exec = {
-      get_form_schema: async (args, { signal }) =>
-        sync(await (await fetch(`/api/form/schema?sessionId=${args.sessionId || getSession()}`, { signal })).json()),
-      get_available_slots: async (args, { signal }) => {
+      get_form_schema: async (args, extras) =>
+        sync(await (await fetch(`/api/form/schema?sessionId=${args.sessionId || getSession()}`, { signal: extras && extras.signal })).json()),
+      get_available_slots: async (args, extras) => {
         const q = new URLSearchParams();
         if (args.from) q.set("from", args.from);
         if (args.to) q.set("to", args.to);
-        const data = await (await fetch(`/api/slots?${q}`, { signal })).json();
+        const data = await (await fetch(`/api/slots?${q}`, { signal: extras && extras.signal })).json();
         this.#slots = data.slots || [];
         this.#render(this.shadowRoot);
         return JSON.stringify(data);
       },
-      submit_step: async (args, { signal }) =>
-        sync(await (await fetch("/api/form/step", { method: "POST", headers: { "content-type": "application/json" }, signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), stepId: args.stepId, values: args.values || {} }) })).json()),
-      book_slot: async (args, { signal }) =>
-        sync(await (await fetch("/api/book", { method: "POST", headers: { "content-type": "application/json" }, signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), slotId: args.slotId, values: args.values || {} }) })).json()),
-      get_booking_status: async (args, { signal }) => {
+      submit_step: async (args, extras) =>
+        sync(await (await fetch("/api/form/step", { method: "POST", headers: { "content-type": "application/json" }, signal: extras && extras.signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), stepId: args.stepId, values: args.values || {} }) })).json()),
+      book_slot: async (args, extras) =>
+        sync(await (await fetch("/api/book", { method: "POST", headers: { "content-type": "application/json" }, signal: extras && extras.signal, body: JSON.stringify({ sessionId: args.sessionId || getSession(), slotId: args.slotId, values: args.values || {} }) })).json()),
+      get_booking_status: async (args, extras) => {
         const q = new URLSearchParams();
         if (args.email) q.set("email", args.email);
         if (args.bookingId) q.set("bookingId", args.bookingId);
-        return JSON.stringify(await (await fetch(`/api/booking?${q}`, { signal })).json());
+        return JSON.stringify(await (await fetch(`/api/booking?${q}`, { signal: extras && extras.signal })).json());
       },
     };
     for (const [name, description, inputSchema, readOnly] of TOOLS) {

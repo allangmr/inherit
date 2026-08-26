@@ -21,8 +21,8 @@ export type ModelContextTool = {
   description: string;
   inputSchema: JsonSchema;
   execute: (
-    args: Record<string, unknown>,
-    extras: { signal: AbortSignal },
+    args: Record<string, unknown> | string,
+    extras?: { signal?: AbortSignal },
   ) => Promise<unknown> | unknown;
   annotations?: {
     readOnlyHint?: boolean;
@@ -46,11 +46,22 @@ export type ModelContext = {
   ) => Promise<void>;
   getTools?: (options?: { fromOrigins?: string[] }) => Promise<RegisteredTool[]>;
   executeTool?: (
-    tool: RegisteredTool,
+    tool: RegisteredTool | string,
     input: string,
     options?: { signal?: AbortSignal },
   ) => Promise<unknown>;
   addEventListener?: (type: "toolchange", listener: EventListener) => void;
+};
+
+/** Chrome 146–149 consumer surface, gated by #enable-webmcp-testing. */
+export type ModelContextTesting = {
+  listTools?: () => Promise<RegisteredTool[]>;
+  getTools?: () => Promise<RegisteredTool[]>;
+  executeTool?: (
+    nameOrTool: string | RegisteredTool,
+    input: string,
+    options?: { signal?: AbortSignal },
+  ) => Promise<unknown>;
 };
 
 declare global {
@@ -61,6 +72,7 @@ declare global {
   interface Navigator {
     /** @deprecated Chrome 150. Use document.modelContext. Kept for ChatGPT in-app browser / Chrome 149. */
     modelContext?: ModelContext;
+    modelContextTesting?: ModelContextTesting;
   }
 }
 

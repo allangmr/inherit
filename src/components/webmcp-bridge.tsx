@@ -13,6 +13,7 @@ import { WebMcpIndicator } from "./webmcp-indicator";
 type WebMcpBridgeProps = {
   sessionId: string;
   exposedTo?: string[];
+  enabled?: boolean;
 };
 
 function initialStatus(): WebMcpStatus {
@@ -22,10 +23,11 @@ function initialStatus(): WebMcpStatus {
   return "registering";
 }
 
-export function WebMcpBridge({ sessionId, exposedTo }: WebMcpBridgeProps) {
-  const [status, setStatus] = useState<WebMcpStatus>(initialStatus);
+export function WebMcpBridge({ sessionId, exposedTo, enabled = true }: WebMcpBridgeProps) {
+  const [status, setStatus] = useState<WebMcpStatus>(enabled ? initialStatus : "unavailable");
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     const context = getModelContext();
 
@@ -45,7 +47,7 @@ export function WebMcpBridge({ sessionId, exposedTo }: WebMcpBridgeProps) {
       });
 
     return () => controller.abort();
-  }, [sessionId, exposedTo]);
+  }, [sessionId, exposedTo, enabled]);
 
   return <WebMcpIndicator status={status} />;
 }

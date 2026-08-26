@@ -11,6 +11,58 @@ export function getModelContext(): ModelContext | null {
   return null;
 }
 
+export function getModelContextTesting() {
+  if (typeof navigator === "undefined") return null;
+  return navigator.modelContextTesting ?? null;
+}
+
+export function probeWebMcp() {
+  const producer = getModelContext();
+  const testing = getModelContextTesting();
+  return {
+    secureContext: typeof window !== "undefined" && window.isSecureContext,
+    documentModelContext: Boolean(typeof document !== "undefined" && document.modelContext),
+    navigatorModelContext: Boolean(typeof navigator !== "undefined" && navigator.modelContext),
+    registerTool: Boolean(producer && typeof producer.registerTool === "function"),
+    getTools: Boolean(producer && typeof producer.getTools === "function"),
+    executeTool: Boolean(producer && typeof producer.executeTool === "function"),
+    testing: Boolean(testing),
+    testingListTools: Boolean(
+      testing && (typeof testing.listTools === "function" || typeof testing.getTools === "function"),
+    ),
+    testingExecuteTool: Boolean(testing && typeof testing.executeTool === "function"),
+    userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+  };
+}
+
+export async function listRegisteredTools() {
+  const producer = getModelContext();
+  if (producer?.getTools) return producer.getTools();
+  const testing = getModelContextTesting();
+  if (testing?.getTools) return testing.getTools();
+  if (testing?.listTools) return testing.listTools();
+  return [];
+}
+
+export async function executeRegisteredTool(name: string, args: Record<string, unknown> = {}) {
+  const input = JSON.stringify(args);
+  const testing = getModelContextTesting();
+  // Chrome 146–149: navigator.modelContextTesting.executeTool(name, json)
+  if (testing?.executeTool) {
+    return testing.executeTool(name, input);
+  }
+  const producer = getModelContext();
+  if (producer?.executeTool) {
+    const tools = await listRegisteredTools();
+    const match = tools.find((tool) => tool.name === name);
+    if (!match) throw new Error(`Tool not found: ${name}`);
+    return producer.executeTool(match, input);
+  }
+  throw new Error(
+    "Chrome WebMCP consumer API is missing. Enable chrome://flags/#enable-webmcp-testing and relaunch.",
+  );
+}
+
 export function isSecureContextForWebMcp() {
   return typeof window !== "undefined" && window.isSecureContext;
 }

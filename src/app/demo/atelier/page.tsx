@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HostSystem } from "@/components/host-system";
 import { InheritForm } from "@/components/inherit-form";
 
 export const metadata = {
@@ -65,7 +66,8 @@ export default function AtelierPage() {
             </blockquote>
           </article>
           <aside>
-            <InheritForm preset="atelier" compact />
+            <HostSystem preset="atelier" client="Atelier" />
+            <InheritForm preset="atelier" compact sessionKey="atelier-host" />
           </aside>
         </div>
       </div>

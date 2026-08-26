@@ -2,6 +2,8 @@ import Link from "next/link";
 
 const links = [
   { href: "/book", label: "Book" },
+  { href: "/lab", label: "WebMCP lab" },
+  { href: "/demo/compare", label: "Compare" },
   { href: "/demo/atelier", label: "Atelier" },
   { href: "/demo/northline", label: "Northline" },
 ];
