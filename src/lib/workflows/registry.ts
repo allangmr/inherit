@@ -1,6 +1,6 @@
 import { bookingWorkflow } from "./booking";
 import { briefWorkflow } from "./brief";
-import type { WorkflowDefinition } from "@/lib/workflow/types";
+import type { WorkflowDefinition } from "@inherit/core";
 
 const workflows: Record<string, WorkflowDefinition> = {
   booking: bookingWorkflow,

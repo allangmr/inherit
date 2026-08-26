@@ -9,3 +9,9 @@ export class StaleSessionError extends Error {
     this.actual = actual;
   }
 }
+
+export function isStale(error: unknown) {
+  return Boolean(
+    error && typeof error === "object" && (error as { name?: string }).name === "StaleSessionError",
+  );
+}

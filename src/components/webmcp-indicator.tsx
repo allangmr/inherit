@@ -1,4 +1,4 @@
-import type { WebMcpStatus } from "@/lib/webmcp";
+import type { WebMcpStatus } from "@inherit/webmcp";
 
 const labels: Record<WebMcpStatus, string> = {
   ready: "Agent tools ready",

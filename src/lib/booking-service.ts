@@ -1,18 +1,13 @@
-import { FORM_ID } from "./config";
-import { formDefinition, nextStepId, validateAll, validateStep, type FormValues } from "./form-definition";
+import "./inherit-runtime";
+import { formDefinition, type FormValues } from "./form-definition";
 import { getCalendarProvider, describeCalendar } from "./providers";
 import { getStore } from "./sqlite-store";
-import type { Actor, BookingRecord, SessionRecord } from "./store";
+import type { Actor, BookingRecord } from "./store";
 import { formatSlotRange } from "./time";
 import { getWorkflow } from "./workflows/registry";
-import {
-  bumpSession,
-  ensureSession,
-  getWorkflowState,
-  mergeProvenance,
-  recordActivity,
-} from "./workflow/session";
-import { StaleSessionError } from "./workflow/stale";
+import { getInheritRuntime } from "./runtime-ref";
+import { mergeProvenance, StaleSessionError, validateAll } from "@inherit/core";
+import type { SessionRecord } from "@inherit/core";
 
 function nowIso() {
   return new Date().toISOString();
@@ -22,22 +17,24 @@ function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-export function emptySession(id: string): SessionRecord {
-  const workflow = getWorkflow("booking");
-  return {
-    id,
-    workflowId: workflow.id,
-    formId: FORM_ID,
-    currentStepId: workflow.form.steps[0].id,
-    values: {},
-    completedStepIds: [],
-    bookingId: null,
-    version: 1,
-    provenance: {},
-    proposal: null,
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
-  };
+function bumpSession(
+  session: SessionRecord,
+  patch: Partial<SessionRecord>,
+  expectedVersion?: number,
+) {
+  return getInheritRuntime().bumpSession(session, patch, expectedVersion);
+}
+
+function ensureSession(sessionId?: string | null, workflowId?: string | null) {
+  return getInheritRuntime().ensureSession(sessionId, workflowId);
+}
+
+function getWorkflowState(sessionId?: string | null, workflowId?: string | null) {
+  return getInheritRuntime().getState(sessionId, workflowId);
+}
+
+function recordActivity(input: Parameters<ReturnType<typeof getInheritRuntime>["recordActivity"]>[0]) {
+  return getInheritRuntime().recordActivity(input);
 }
 
 export { ensureSession, getWorkflowState, StaleSessionError };
@@ -51,35 +48,12 @@ export function submitStep(
   stepId: string,
   values: Record<string, string | boolean | undefined>,
 ) {
-  const session = ensureSession(sessionId);
-  const workflow = getWorkflow(session.workflowId);
-  const merged = { ...session.values, ...values };
-  const errors = validateStep(stepId, merged, workflow.form);
-  if (errors.length) {
-    return {
-      ok: false as const,
-      errors,
-      state: getWorkflowState(session.id),
-    };
-  }
-
-  const completed = new Set(session.completedStepIds);
-  completed.add(stepId);
-  const upcoming = nextStepId(stepId, workflow.form);
-  bumpSession(session, {
-    values: merged,
-    completedStepIds: [...completed],
-    currentStepId: upcoming ?? stepId,
-    provenance: mergeProvenance(session, values, "human", "input"),
+  return getInheritRuntime().submitStep({
+    sessionId,
+    stepId,
+    values,
+    actor: "human",
   });
-
-  return {
-    ok: true as const,
-    errors: [],
-    advancedTo: upcoming,
-    completed: !upcoming,
-    state: getWorkflowState(session.id),
-  };
 }
 
 export async function listAvailableSlots(input?: { from?: string; to?: string }) {
@@ -118,8 +92,8 @@ export async function bookSlot(input: {
     consent: input.values?.consent ?? session.values.consent ?? true,
   };
 
-  if (session.bookingId) {
-    const existing = store.getBooking(session.bookingId);
+  if (session.recordId) {
+    const existing = store.getBooking(session.recordId);
     if (existing?.status === "confirmed" && existing.slotId === input.slotId) {
       return {
         ok: true as const,
@@ -195,7 +169,7 @@ export async function bookSlot(input: {
       values,
       currentStepId: "confirm",
       completedStepIds: formDefinition.steps.map((step) => step.id),
-      bookingId,
+      recordId: bookingId,
       proposal: null,
       provenance: mergeProvenance(session, { slotId: slot.id }, actor, input.toolName ? "tool" : "input"),
     },
@@ -233,14 +207,14 @@ export async function rescheduleBooking(input: {
   const calendar = getCalendarProvider();
   const actor = input.actor ?? "human";
   const session = ensureSession(input.sessionId);
-  if (!session.bookingId) {
+  if (!session.recordId) {
     return {
       ok: false as const,
       errors: [{ fieldId: "booking", message: "There is no active booking to reschedule." }],
       state: getWorkflowState(session.id),
     };
   }
-  const booking = store.getBooking(session.bookingId);
+  const booking = store.getBooking(session.recordId);
   if (!booking || booking.status !== "confirmed") {
     return {
       ok: false as const,
@@ -325,14 +299,14 @@ export async function cancelBooking(input: {
   const store = getStore();
   const actor = input.actor ?? "human";
   const session = ensureSession(input.sessionId);
-  if (!session.bookingId) {
+  if (!session.recordId) {
     return {
       ok: false as const,
       errors: [{ fieldId: "booking", message: "There is no booking to cancel." }],
       state: getWorkflowState(session.id),
     };
   }
-  const booking = store.getBooking(session.bookingId);
+  const booking = store.getBooking(session.recordId);
   if (!booking || booking.status !== "confirmed") {
     return {
       ok: false as const,

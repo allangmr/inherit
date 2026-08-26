@@ -1,14 +1,14 @@
 export function ArchitectureDiagram() {
   return (
     <figure className="inh-arch" aria-label="Inherit architecture">
-      <div className="inh-arch-node">Workflow definition</div>
+      <div className="inh-arch-node">Inherit SDK</div>
       <span className="inh-arch-arrow" aria-hidden="true">
         ↓
       </span>
       <div className="inh-arch-row">
-        <div className="inh-arch-node">Human UI</div>
-        <div className="inh-arch-node">WebMCP tools</div>
-        <div className="inh-arch-node">Validation</div>
+        <div className="inh-arch-node">defineWorkflow</div>
+        <div className="inh-arch-node">Runtime</div>
+        <div className="inh-arch-node">WebMCP adapter</div>
       </div>
       <span className="inh-arch-arrow" aria-hidden="true">
         ↓
@@ -17,7 +17,7 @@ export function ArchitectureDiagram() {
       <span className="inh-arch-arrow" aria-hidden="true">
         ↓
       </span>
-      <div className="inh-arch-node">Domain actions</div>
+      <div className="inh-arch-node">App domain handlers</div>
     </figure>
   );
 }
