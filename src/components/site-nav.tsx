@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const links = [
-  { href: "/#api", label: "API", wide: true },
+  { href: "/docs", label: "Docs" },
   { href: "/demo/atelier", label: "Appointment" },
   { href: "/demo/studio", label: "Brief" },
   { href: "/book", label: "ChatGPT" },

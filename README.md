@@ -39,6 +39,7 @@ A person typing a name and an agent calling `submit_step` write the same session
 | URL | What to notice |
 | --- | --- |
 | [`/`](/) | Package landing. SDK thesis, public API, real demo screenshots. |
+| [`/docs`](/docs) | Developer docs. Install, quickstart, workflows, React, WebMCP, API. |
 | [`/book`](/book) | Top-level ChatGPT URL. Tools register on this document. |
 | [`/demo/atelier`](/demo/atelier) | Appointment workflow in a warm editorial host |
 | [`/demo/studio`](/demo/studio) | Creative brief. Different steps, same runtime. |
