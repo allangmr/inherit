@@ -63,7 +63,10 @@ export function DocsLanding() {
                 <code>submit_step</code> write the same session. There is no second agent API.
               </p>
               <div className="docs-actions">
-                <Link href="/demo/atelier" className="docs-btn" data-kind="primary">
+                <Link href="/docs" className="docs-btn" data-kind="primary">
+                  Developer docs
+                </Link>
+                <Link href="/demo/atelier" className="docs-btn" data-kind="ghost">
                   Appointment demo
                 </Link>
                 <Link href="/demo/studio" className="docs-btn" data-kind="ghost">
@@ -431,7 +434,8 @@ export function DocsLanding() {
                 <code>package.json</code> stays <code>private: true</code>. MIT license. Source
                 is public at{" "}
                 <a href={GITHUB}>github.com/allangmr/inherit</a>. Booking lives on{" "}
-                <Link href="/book">/book</Link> for ChatGPT. This page is the package.
+                <Link href="/book">/book</Link> for ChatGPT. This page is the package. The
+                developer guide is <Link href="/docs">/docs</Link>.
               </p>
             </div>
           </div>
@@ -460,6 +464,8 @@ export function DocsLanding() {
           <p>Inherit · in-repo SDK · MIT · OpenAI WebMCP Challenge 2026</p>
           <p>
             <a href={GITHUB}>GitHub</a>
+            {" · "}
+            <Link href="/docs">/docs</Link>
             {" · "}
             <Link href="/book">/book</Link>
             {" · "}
