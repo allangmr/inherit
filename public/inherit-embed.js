@@ -171,6 +171,15 @@ class InheritFormElement extends HTMLElement {
     }
   }
 
+  #fields(defs, values) {
+    return defs
+      .map(
+        ([name, label, type]) =>
+          `<label class="inh-field"><span>${label}</span><input class="inh-input" name="${name}" type="${type}" value="${values[name] || ""}"></label>`,
+      )
+      .join("");
+  }
+
   #render(root) {
     if (!root) return;
     const { currentStepId, values, booking } = this.#state;
